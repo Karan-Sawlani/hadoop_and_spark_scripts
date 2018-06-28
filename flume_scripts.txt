@@ -1,0 +1,1 @@
+flume-ng -n web_logs_to_hdfs -f /path_to_conf_file

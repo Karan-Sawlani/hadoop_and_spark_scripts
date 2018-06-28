@@ -1,0 +1,448 @@
+hive>
+
+#to see hdfs dfs -command or hadoop fs -command in hive type
+ 
+dfs -command;
+
+#create database and table (managed table here location is not mandatory and structure of data and data both are lost)
+
+-> create database xademo;
+-> use xademo;
+-> create table orders(order_id int,order_date string,order_customer_id int,order_status string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> create table customers(customer_id int,customer_fname string,customer_lname string,customer_email string,customer_password string,customer_street string,customer_city string,customer_state  string,customer_zipcode string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> create table order_items(order_item_id int,order_item_order_id int,order_item_product_id int,order_item_quantity int,order_item_subtotal float,order_item_product_price float) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> create table departments(department_id int,department_name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> create table products(product_id int,product_category_id int,product_name string,product_description string,product_price float,product_image string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> create table categories(category_id int,category_department_id int,category_name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+
+#load data into tables
+
+-> LOAD DATA COMMANDS DIRECTLY MOVES ( **NOT COPIES** ) DATA FROM ONE SPECIFIED LOCATION TO ANOTHER AND HERE DATA STRUCTURE HAS TO BE SAME AS CONSIDERS THAT DATA IS DEFINED CORRECTLY BY SEEING ALL DELIMITERS AND TRANSFORMATIONS AND ETC... BY DEVELOPER SO THIS COMMAND HAS ONLY WORK THAT IS TO MOVE THE DATA OF SAME STRUCTURE ELSE IT IS LIKELY TO HAVE INCONSISTENT RESULTS...ALL THIS WE SEE IN THE HDFS COPY NOT LOCAL AND ALSO IT DONT RUN ANY MAP-REDUCE JOBS JUST ONLY COPIES FILES USING FILE SYSTEM APIS SO IT DEALS WITH LEVEL HENCE CANT DO ANY TRANSFORMATIONS HERE NO EXCEPTIONS RESULTS ARE SHOWN WHEN YOU QUERY YOU WILL DIRECTLY SEE INCORRECT DATA IF NOT DONE CORRECT..) 
+
+(by local linux file system here data is copied not moved)
+
+-> LOAD DATA LOCAL INPATH '/home/karan/Desktop/Directly copied from hdfs after sqoop_import/orders' overwrite into table orders ; (overwrite used to replace and then write else it appends)
+-> LOAD DATA LOCAL INPATH '/home/karan/Desktop/Directly copied from hdfs after sqoop_import/order_items' into table order_items ;
+-> LOAD DATA LOCAL INPATH '/home/karan/Desktop/Directly copied from hdfs after sqoop_import/categories' into table categories ;
+
+(by hdfs sqoop_import itself)
+
+-> LOAD DATA INPATH '/user/root/sqoop_import/products' into table products ;
+-> LOAD DATA INPATH '/user/root/sqoop_import/customers' into table customers ;
+-> LOAD DATA INPATH '/user/root/sqoop_import/deparments' into table departments ;
+
+#create external table (here location is mandatory to be given,here only structure of data is lost not the original data on dropping the table eg. say once you created external table and then once you drop the table the structure will be lost but the data will be in th external location that you defined also any changes you made in external data file will also be shown in table when you generate a query say select * from ext_departments; it will show your changes made in external file.)
+
+-> create external table departments(department_id int,department_name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '/ext_tble' ; (as database is xademo so this table although on another path but is accessible by xademo like other tables eg. departments or customers etc..)
+-> here ext_table has a file named t.txt which has data (hdfs dfs -appendToFile - /ext_table/t.txt 2,hello 3,hi....etc ..) 
+
+Note : -> Same Structure must be defined on external table.
+
+#storing data in avro format (data is imported in avro format by sqoop itself)
+
+-> hdfs dfs -mkdir /avro_ext_tble
+-> hdfs dfs -put(or copyFromLocal) /home/karan/*.avsc /avro_ext_tble
+-> hdfs dfs -ls /avro_ext_tble (o/p is categories.avsc departments.avsc etc..)
+
+-> create external table departments(department_id int,department_name string) ROW FORMAT SERDE 'org.apache.hadoop.hive.Serde2.avro.AvroSerDe' STORED AS AVRO LOCATION '/user/root/sqoop_import/departments'{it is sqoop_warehouse directory that contains data in avro format as we need it to create external table} TBLPROPERTIES ('avro.schema.url'='hdfs://localhost:9000/avro_ext_tble/departments.avsc); {only used to store table properties and can be derived from avro}
+
+OR 
+
+-> STORED AS INPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat' OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat' ; 
+   {No need to learn it comes with describe formatted .... do it where warehouse directory of sqoop is}
+
+INSTEAD OF 
+
+-> STORED AS AVRO
+
+OR 
+
+-> create external table departments(department_id int,department_name string) ROW FORMAT SERDE 'org.apache.hadoop.hive.Serde2.avro.AvroSerDe' STORED AS AVRO LOCATION    '/user/root/sqoop_import/departments' ;
+
+INSTEAD OF
+
+-> TBLPROPERTIES('avro.schema.url'='hdfs://localhost:9000/avsc_ext_tble/departments.avsc)
+
+[LIKEWISE CREATE ALL 6 TABLES]
+
+#PARTITIONING ALSO REFFERED AS NESTED PARTIONING [SAME AS LIST PARTITIONING IN TRADITIONAL RDBMS][CREATES PARTITIONED DIRECTORIES WHERE DATA OF TABLE IS DIVIDED AS PER YOUR PARTITION CRITERIA GIVEN HERE IF DONE FOR order_month THEN DIRECTORIES OF MONTHS CREATED AND DATA OF TABLE IS DIVIDED AND WRITTEN ON DIFFERENT DIRECTORIES CAN CHECK BY dfs -cat /user/hive/warehouse/orders_part/order_month=2014-07/* OUTPUT COMES TO BE WHATEVER DATA IS ON TABLE OF WHOLE MONTH NO EXTRA DATA IS WRITTEN OR WASTED ..] [IF SELECT * FROM orders_part then shows 5 coloumns extra one is of order_month but if dfs -ls on particular directory shows 4 coloumns of that month especially,partitioning is done so as for eg if you have 100 gb data and have to find out certain data then it has to go through whole 100 gb data hence if we did partiitioning then can filter out unneccessary details and hence speed will be faster with less processing done..]
+
+(THERE IS NOTHING LIKE STATIC OR DYNAMIC PARTITIONS BUT IF ADD CUSTOM BY ADD PARTITION THEN IS STATIC ELSE AUTOMATICALLY DYNAMIC)
+
+#PARTITIONING in external table (both can done static as well as dynamic)
+
+-> create external table deps(id int,name string) PARTITIONED BY (change string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' LOCATION '/ext_tble' ;[static partitioning is done]
+-> load data inpath '/ext_tble' OVERWRITE INTO TABLE dep PARTITION(change='h'); {here extra coloumn created with h}
+   (Because when external table is declared, default table path is changed to specified location in hive metadata which contains in metastore, but about partition,nothing is changed, so, we must manually add those metadata.)
+-> alter table deps add partition(change='hi'); [static partitioning is done]
+-> partition(change='hi')                       [for multiple static partitions]
+-> partition(change='l') 
+
+[CREATES partition manually one by one also add more]
+
+[HERE IF WANNA LOAD DATA AS IT MOVES PRE-PROCESSED DATA SO EG: IF ADD PARTITION(order_date='2014-01'); THEN USE THE DATA THAT ONLY HAS order_date like '2014-01' only''BUT IF YOU USE INSERT DATA INTO TABLE order_partition partition(order_month='2014-01') select * from orders where order_date like '2014-01%'; ]
+
+#PARTITIONING in managed table (both can done static as well as dynamic)
+
+-> hive> set hive.exec.dynamic.partition=true,set hive.exec.dynamic.partition.mode=nonstrict; [To make dynamic partition i.e. multiple partitions created automatically via map-reduce jobs,AND THE STRICT MODE IS SIMILAR TO STATIC IF ONLY SINGLE PARTITION]
+
+-> create table orders_part(order_id int,order_date timestamp,order_customer_id int,order_status string) PARTITIONED BY (order_month string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> insert into table orders_part partition (order_month) select order_id, from_unixtime(cast(substr(order_date,1,10) AS bigint)) order_date,order_customer_id,order_status,substr(from_unixtime(cast(substr(order_date,1,10) AS bigint)),1,7) order_month from orders;
+
+-> [Note:-> here if create table with datatype of (order_date date shows null, string and timestamp shows original value) after loading data also may work with (substr(order_date,1,10) order_date instead of from_unixtime(cast(substr(order_date,1,10)as bigint)) order_date) and substr(order_date,1,7) order_month instead of substr(from_unixtime(cast(substr(order_date,1,10))as bigint),1,7)]
+
+OR
+
+-> create table orders_part(order_id int,order_date timestamp,order_customer_id int,order_status string) PARTITIONED BY (order_month string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> insert into table orders_part partition (order_month) select order_id,substr(order_date,1,10) order_date,order_customer_id,order_status,substr(order_date,1,7) order_month from orders;
+
+[CREATES partition automatically or dynamically that is more than one via map reduce jobs]
+
+#BUCKETING [IT IS SIMILAR TO HASH PARTITIONING IN TRADITIONAL RDBMS,AND HAVE HAS NO RANGE PARTITIONING],[AS IN PARTITONED BY ANOTHER COLUMN IS DEFINED BY USER WITH ITS DATA TYPE AS IN order_month string BUT HERE NO NEED TO DEFINE ANY SPECIFIC OTHER USER DEFINED COLUMNS WITH ANY DATA-TYPE AS IT WILL ALREADY BE MENTIONED IN CREATE TABLE(COLUMN NAMES).. HERE USED 'CLUSTERED BY' CLAUSE FOR BUCKETING]
+
+#DIFFERENCE IN INSERT COMMANDS OF STATIC AND DYNAMIC PARTITIONS........!!!!!!
+
+-> INSERT IN STATIC PARTITIONING (insert into table o_part_static partition (order_month='2014-01') select * from orders where order_date like '2014-01%' ;)
+-> INSERT IN DYNAMIC PARTITIONING (insert into table o_part_dynamic partition (order_month) select o.*,substr(order_date,1,7) from orders o;)
+
+-> BUCKETING DIVIDES THE DATA INTO DIFFERENT FILES AS MANY AS USER SPECIFIES AND HENCE IT CAN BE NOW EASIER TO SEE ALL FILES INTO PARTS AND CAN SEE WHAT SPECIFIC DATA WE WANNA SEE HERE 16 D/W FILES ARE CREATED..CAN SEE BY dfs -ls.....)
+
+-> create table orders_bucket(order_id int,order_date timestamp,order_customer_id int,order_status string) CLUSTERED BY (order_id) INTO 16 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
+-> insert into table orders_bucket select order_id,substr(order_date,1,10) order_date,order_customer_id,order_status from xademo.orders;
+
+OR 
+
+-> can use insert into orders_bucket select * from orders (if not to use substring for order_date in order to seperate that '00:00:00' from date);
+
+# ** important mysql codes
+
+-> ordering 
+
+EG: SELECT order_status,count(*) from orders group by order_status order by count(*)/count(any no.);
+
+OR 
+
+EG: SELECT order_status ,count(*) ordr_cnt from orders group by order_status order by ordr_cnt;
+
+ALSO
+
+#to get order_status count on a particular_date
+ 
+-> select order_status,count(*) from orders where order_date ="2013-12-14" group by order_status;
+
+#to get complete orders from each date before 2013-12-14 
+
+-> select order_date,count(*) from orders where order_status="COMPLETE" and order_date<="2013-12-14" group by order_date;
+
+#to select order_date count on order_status where status is on_hold,payment_pending,payment_review;
+
+-> select order_date,count(*) from orders where order_date like "2013-12-%" and order_status in ("PENDING","PENDING_PAYMENT","ON_HOLD") group by order_date;
+
+OR 
+
+-> select order_date,count(*) from orders where order_date between "2013-12-01 00:00:00" and "2013-12-31 00:00:00" and order_status IN ("PENDING","PAYMENT_PENDING","ON_HOLD") group by order_date;
+
+OR
+
+-> select order_date,count(*) from orders where order_date like "2013-12-%" and (order_status like "PENDING%" OR order_status in("ON_HOLD"));
+
+OR
+
+-> select order_date,count(*) from orders where order_date like "2013-12-%" and (order_status like "PENDING%" OR order_status="ON_HOLD");
+
+**(IN SAME COLUMNS OR "IN" DIFFERENT COLUMNS "AND")**
+
+-> JOIN ANY DATASET SUBTOTAL IT ON EACH FIELD
+
+EG: SELECT order_date,sum(order_item_subtotal) from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_date;
+
+-> IN INSERT YOU CAN GIVE BOTH EITHER SPECIFY COLUMN NAMES IN BRACKET WHILE INSERT OR NOT UPTO YOU
+
+EG: INSERT INTO departments VALUES ()...
+
+OR 
+ 
+EG: INSERT INTO departments(department_id,department_name) VALUES ()..
+
+OR 
+
+EG: INSERT INTO departments VALUES (1,2),(2,3),(4,5).
+
+BUT IN HIVE YOU DO
+
+EG: INSERT INTO TABLE dept values();
+
+OR
+
+EG: INSERT INTO dept VALUES (1,2),(2,3),(4,5). (everytime the values are inserted in a hive table the directory is made in hdfs)
+
+OR
+
+EG: INSERT INTO TABLE dept SELECT * FROM departments;
+
+OR
+
+EG: INSERT OVERWRITE INTO TABLE dept SELECT * FROM departments;
+
+-> TO COPY DATA FROM MYSQL DB TO LOCAL FILE SYSTEM (HINT : IT CAN BE USED INSTEAD IF SQOOP NOT WORKING ON LOCAL LINUX VIRTUAL BOX OF MINE...LOL)
+
+-> sudo mysql -u root -p  -e 'use retail_db;select * from departments' > local_file  (linux concept) 
+
+OR
+
+-> SELECT * FROM departments INTO OUTFILE '/home/karan/Desktop/dep' fields terminated by ';' lines terminated by ';'  ;
+
+# Difference b/w insert into table and create table command :- very importnant to understand **
+
+(for insert create table first and specify columns name and datatype as in creating table...) 
+
+-> create table dz(dep_id int,dep_name string); 
+   insert into table dz select * from departments;
+
+(for create table as in this only had to create table as compared to another already created table no need to do any other activity like columns and or create table first etc)
+
+-> create table dz as select * from departments;
+
+-> SO, NOW AS NO NEED TO SPECIFY COLUMNS IN THIS 'CTAS' (CREATE-TABLE-AS-SELECT) SO (PARTITIONED BY,SKEWED BY,CLUSTERED BY) ALL ARE NOT POSSIBLE...
+
+-> create table orders_ctas ROW FORMAT DELIMITED FIELDS TERMINATED BY '\;' as select * from orders; (can check by dfs -ls location data is seperated by ;)
+
+# ORC FORMAT
+
+-> create table orders_orc ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' STORED AS ORC (or parquet for parquet format) as select * from orders;
+
+OR
+
+-> create table orders_orc STORED AS ORC as select * from orders;
+
+OR
+
+-> create table dep_orc(department_id int,department_name string) STORED AS ORC;
+
+# SEE YOUR OWN TYPED SYNTAX IN ENHANCED ACTUAL I/O SERDE FORMAT :
+
+-> show create table departments; (can give any table_name  although the comand you give will only create table...(coloumn names with data types) ROW FORMAT........    STORED AS TEXTFILE o/p shown will be all enhanced that is what is actuall class to define TEXTFILE,LOCATION and etc:- 
+
+CREATE TABLE `departments`(
+  `department_id` int, 
+  `department_name` string)
+ROW FORMAT DELIMITED 
+  FIELDS TERMINATED BY ',' 
+STORED AS INPUTFORMAT 
+  'org.apache.hadoop.mapred.TextInputFormat' 
+OUTPUTFORMAT 
+  'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+LOCATION
+  'hdfs://localhost:9000/user/hive/warehouse/xademo.db/departments'
+TBLPROPERTIES (
+  'COLUMN_STATS_ACCURATE'='true', 
+  'numFiles'='6', 
+  'numRows'='0', 
+  'rawDataSize'='0', 
+  'totalSize'='60', 
+  'transient_lastDdlTime'='1502656741')
+) 
+
+# above is a shortcut cheatcode to see the syntax if custom files are given then you have to use it then in this case you will not use "ROW FORMAT DELIMITED" instead you will use "ROW FORMAT SERDE name of file given followed by INPUTFORMAT and OUTPUTFORMAT files will be given and if not know the syntax how to write then you may see it by show create table any_table_name"
+
+# DEFINING DELIMITERS (ROW FORMAT DELIMITED FIELDS TERMINATED BY , LINES TERMINATED BY , NULLS REPRESENTATION,etc..)
+
+NOTE :->  here load data inpath '/..' will not work to change delimiters as it will give null values all as load is preprocessed dataset so to change delimeters use insert or ctas.
+
+-> create table departments(department_id int,department_name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ':' NULL DEFINED AS '-1';
+ 
+-> (lines terminated by is not supported till now can be in future... it can have only have a new line character till now not supported rest basic format of a table) 
+
+-> all nulls will be represented by -1 although you will see data on hive as null only but on dfs -ls it will show -1:-1 for null null
+
+# CONCEPT OF COMPRESSION 
+
+-> (DEPENDS ON FILE FORMAT NO TENSION TO STRUCTURE OF TABLE)
+
+TAKE THE COMPRESSED DATA DOWNLOAD FROM GITHUB OR CREATE AND THEN COPY 
+
+-> CREATE TABLE departments(dep_id int.name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+   LOAD DATA LOCAL INPATH '/home/karan/Desktop/departments.gz' INTO TABLE departments;
+
+OR 
+
+WHILE LOADING DATA COMPRESS IT
+
+-> AS IT REQUIRES MODIFICATION,TRANSFORMATION HENCE CANT USE LOAD
+
+-> HERE FIRST OF ALL (set hive.exec.compress.output=true
+                     set io.seqfile.compression.type=none/record/block(any of these to better for requirement at block level or etc..))
+
+-> TO CHECK THE SET COMPRESS COMMANDS DO NOT REMEMBER JUST DO :-
+
+-> hive -e "set;"|grep compress (hive -e will execute set query in hive and comes out after that a linux concept is used of grep to find out names compress in o/p of  hive -e query...HENCE IT SHOWS ALL SET COMPRESS COMMANDS OF HIVE)
+-> SET io.compression.codecs;(shows 3 default,snappy,gzip)
+-> SET dfs.image.compress=false
+-> SET dfs.image.compression.codec=org.apache.hadoop.io.compress.DefaultCodec (HERE GIVE WHATEVER CODEC GIVEN IN TO DO CUSTOM BUT IN CORE-SITE.XML OF HADOOP YOU CAN       SEE ONLY 3 ARE DEFINED SNAPPY,GZIP,DEFAULT SO,HERE ADD CUSTOM JAR AND THEN EXECUTE AFTER THAT)
+-> SET hive.exec.compress.intermediate=false (HERE IF THIS WILL BE TRUE THEN THE I/P TO REDUCER THAT IS O/P BY MAPPER WILL BE COMPRESSED TOO..)
+-> SET hive.exec.compress.output=true        (HERE IT IS MOST IMPORTANT FACTOR TO BE SET AFTER THIS O/P WILL BE IN COMPRESSED FORMAT....NOT DEPENDENT ON ALIAS THAT IS    IN HADOOP MAPRED-SITE.XML JUST DO IT SET AND WORK IS DONE)
+-> SET hive.exec.orc.compression.strategy=SPEED
+-> SET hive.exec.orc.default.compress=ZLIB 
+
+(IN MAPRED-SITE.XML SEARCH FOR COMPRESS AND YOU WILL SEE 2 PARAMETERS NAMED mapreduce.map.output.compress THIS IS ALIAS TO hive.exec.compress.intermediate AND mapreduce.output.fileoutputformat.compress IS AN ALIAS TO hive.exec.compress.output(MAKE IT TRUE IF NOT) ALSO IT HAVE A PARAMETER OF mapreduce.output.fileoutputformat.compress.codec=(VALUE DEFINED IN IO.COMPESSSION.CODECS) GIVE VALUE AS DETERMINED HERE JAR FILE MUST BE AVAILABLE THEN SET io.compression.codec=(value given)...)
+
+-> CREATE TABLE departments_compress(dep_id int,name string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+   INSERT INTO TABLE departments_compress SELECT * FROM departments;
+
+(NOW FILES ARE COMPRESSED AND CAN BE SEEN BY dfs -ls AND HAS EXTENSION OF .deflate)
+
+# CHANGE OF EXECUTION ENGINE THAT IS TEZ FROM MAP-REDUCE
+
+-> SET hive.execution.engine=tez;( by default it is mr and can be changed to spark or tez ) 
+**here tez uses concept of dags not map-reduce
+
+# HIVE JOINS (SIMILAR TO MYSQL JOINS)
+
+-> SELECT substr(order_date,1,10),sum(order_item_subtotal) from orders o join order_items oi on o.order_id=oi.order_item_order_id group by substr(order_date,1,10);
+ 
+**BY TEZ IT TAKES 16 SEC BUT BY MR IT TAKES 29 SEC SO TEZ IS FASTER FOR PIG & HIVE BUT ONLY COMES IN HORTONWORKS AMBARI NOT IN CLOUDERA 
+
+-> TO SEE EXPLAIN OF WHAT GOING ON JUST DO (EXPLAIN (query here it is :-> )SELECT order_date,sum(order_item_subtotal) from orders o join order_items oi on       o.order_id=oi.order_item_order_id group by order_date;)
+
+-> maps - reads data & reducer - aggregtes it (sum,count etc)
+
+# UPDATE,DELETE,INSERT IN HIVE TABLES
+
+-> create table depatz (i int,j sting) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' 
+   insert into table departz values(1,"you"),(2,"gu");
+
+-> delete from departz where i=1; (fails although correct due to limitations so..)
+
+NOTE :-> if not know which set parameter to be (set;) in hive go to (vi /etc/hive/conf/hive-site.xml) and then serach for eg. warehouse you will see (hive.metastore.warehouse.dir) now set it and so on.
+NOTE :-> except for textfile all other file formats store data and metadata as well so no need to specify delimiters in rest file formats except textfile format. 
+NOTE :-> for custom input format use ROW FORMAT SERDE as given and INPUTFORMAT OUTPUTFORMAT classname as given.
+NOTE :-> if delimiters or format not same of data and table then stage the data into staging table and then do insert command to load data as eg for orc format the dep_orc is staging table;(a two step process stage and then insert into.)
+
+#LIMITATIONS ON HIVE ARE
+
+-> BEGIN,CONTROL,ROLLBACK NOT SUPPORTED
+-> UPDATE,DELETE ONLY POSSIBLE IN ORC FORMAT (BUT INSERT CAN BE DONE IN ALL FORMATS)
+-> TABLES MUST BE BUCKETED ALSO (SO FOR UPD & DEL BUCKET+ORC)
+-> SET hive.txn.manager;(check it default will be DummyTxnManager make it to DbTxnManager)
+-> SET hive.support.concurrency=true;
+-> SET hive.enforce.bucketing=true;
+-> SET hive.exec.dynamic.partition.mode=non-strict;
+-> SET hive.compactor.initiator=true;
+-> SET hive.compactor.worker.threads=a positive no.;
+-> CANT UPDATE BUCKETED COLUMNS INSTEAD CAN DO TO OTHER COLUMNS EG: NOT TO i BUT CAN UPDATE j whereas in UPDATE OR DELETE FILTER CONDITIONS CAN BE ON ANY COLUMN
+
+# INSERTION
+
+-> create table depatz (i int,j string) CLUSTERED BY (i) INTO 4 BUCKETS STORED AS ORC ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' TBLPROPERTIES('transactional=true');
+-> insert into table departz values(1,"itver"); 
+
+(A CONCEPT CALLED COMPACTION IS USED AS INITIALLY THERE ARE MORE FILES BUT OVERTIME THEY GET MERGED THIS COMPACTION IS ON MOST OF BIGDATA TOOLS NOSQL BASED THESE FILES ARE NAMED DELTA FILES SHOWN AS AN IMMIDIATE AFFECT BUT OVERTIME THEY GET MERGED...)
+
+# UPDATION
+
+-> UPDATE departz set i=3 where j="itver"
+
+# DELETION
+
+-> DELETE FROM departz where i=1;
+
+(ALTHOGH YOU CAN SEE THE ACTUAL DATA INTERNALLY NOT DELETED IT WILL BE WHEN COMPACTION HAPPEN AND THEN YOU CAN SEE ONLY PURE FIELDS IT USES TECHNIQUE CALL TOPSTONE AND VACUUMING...)
+
+# HIVE->SUB_QUERIES
+
+-> select distinct * from (select order_id,substr(order_date,1,10) order_date,order_customer_id,order_status from orders) q;
+
+(alias has to be given always in subqueries,in traditional subqueries there is more flexibility but in hive not much flexibility,as in hive we can use subqueries with "from" only,but in traditional we can use them with "from","select","in","exist" etc...!!)
+
+#HIVE-SORTING
+
+-> Two Types-----------
+
+-> TOTAL SORTING/TOTAL ORDERING (used by ORDER BY clause ->> Here hive uses only one reducer and sort the data i.e sort data entirely)
+
+-> ** select order_status,count(1) ord_cnt from orders group by order_status order by ordr_cnt; 
+
+EG: SELECT order_status,count(*) from orders group by order_status order by count(*)/count(any no.);
+****(THIS IS NOT SUPPORTED IN HIVE YET)
+
+SO USE,
+EG: SELECT order_status,count(*) ord_cnt from orders group by order_status order by ord_cnt;
+
+-> SORT BY clause (here it only sorts within the key i.e sort by group)
+
+# TO CHECK WAREHOUSE_DIR
+
+-> SET hive.metastore.warehouse.dir;
+
+# TRANSFORM DATA FROM ONE FORMAT TO ANOTHER
+
+-> CREATE TABLE departments_avro(department_id int,department_name string) stored as avro
+   INSERT INTO TABLE departments_avro select * from departments;
+
+(NOW DO dfs -ls /user/hive/warehouse/xademo.db/departments_avro/* O/P comes in garbled (avro) format)
+
+-> CREATE TABLE departments_text(department_id int,department_name string) row format delimited fields terminated by ':' stored as textfile
+   insert into table departments_text select * from departments_avro;
+
+(NOW DO dfs -ls /user/hive/warehouse/xademo.db/departments_text/* O/P comes in readable text format)
+
+HENCE,IT GETS CONVERT FROM AVRO TO TEXT..!!
+
+-> **NOTE** ->> ROW FORMAT "DELIMITED FIELDS,LINES TERMINATED,NULL DEFINED" ARE ALL USED ONLY FOR TEXTFILE FORMAT.......
+                ROW FORMAT "SERDE,INPUTFILE,OUTPUTFILE" ALL ARE USED FOR REST ALL FORMATS OF FILES,HERE NOT USED DELIMITED,TERMINATED AND ETC...
+
+# DENORMALIZING DATA (A CONCEPT OF MERGING TABLES IT IS BAD AS RESULTS IN DATA REDUNDANCY OR DUPLICACY BUT IN HIVE CONTEXT AS WE DEAL WITH LARGER DATASETS WE DENORMALIZE SEPERATE TABLES IN ORDER TO GET NEW LARGE BUT SINGLE TABLE HERE MAPREDUCE QUERIES ARE MORE EFFICIENT AS COMPARED TO IN NORMALIZED DATA. HERE SPEED IS FASTER.ACTUALLY JOINS ARE NOT CONSIDERED GOOD SO IN HIVE WE ALREADY DENORMLIZE i.e. JOIN DATASET AND AFTER THAT RUN A MAPRED JOB ALSO WHEN MR JOB IS RUN A DISTRIBUTED CACHE IS USED THAT IS RESPONSIBLE TO LAUNCH ONLY 1 MR JOB BUT IF DISTRIBUTED CACHE IS DISABLED IT MAY USE MULTIPLE MR JOBS IN LARGE DATA AND HENCE TAKES TIME SO DENORMALIZED DATASET IS USED...!!!)
+
+-> create table retail_normalized as select d.*,oi.*,o.order_date from orders o join order_items oi on o.order_id=oi.order_item_order_id join products p on oi.order_item_product_id=p.product_id join categories c on p.product_category_id=c.category_id join departments d on c.category_department_id=d.department_id;
+
+-> select d.department_id,sum(order_item_subtotal) month_revenue,substr(order_date,1,7) order_month from orders o join order_items oi on o.order_id=oi.order_item_order_id join products p on oi.order_item_product_id=p.product_id join categories c on p.product_category_id=c.category_id join departments d on c.category_department_id=d.department_id where order_date like '2013%' group by d.department_id,substr(order_date,1,7);
+
+(ALTHOUGH WE CAN ORDER BY month_revenue but GROUP BY month_revenue will fail..!! so do substr(order_date,1,7) instead of giving alias,ALSO THIS QUERY TAKES 31.88 SECS)
+
+-> CREATE TABLE denormalized_data AS select d.*,oi.*,o.order_date from orders o join order_items oi on o.order_id=oi.order_item_order_id join products p on oi.order_item_product_id=p.product_id join categories c on p.product_category_id=c.category_id join departments d on c.category_department_id=d.department_id;
+
+(THIS TAKES 26.883 SECS,AGGREGATION WILL BE DONE AFTERWARDS CZ IF DONE EARLIER THEN ALREADY GENERATED DATA WILL BE GIVEN AND TABLE IS MADE THAT CANT BE USED LONGER SO CREATED AS PER GRANULARITY AS NOW IN ABOVE TABLE WE CAN GO TO YEAR,MONTH OR EVEN DAY LEVEL ALSO FROM MORE UP TO LOW BUT IF ALREADY AGGREGATED DATA IS STORED THEN SAY FOR EG: OF MONTH THEN WE CAN GO TO YEAR OR HIGHER BUT NOT TO DATE LEVEL THAT IS LOW LEVEL SO...COMMON SENSE..!!)
+
+NOW,
+
+-> SELECT count(*) FROM denormalized_data; 
+[is same as both o/p to 172198]
+-> SELECT count(*) FROM order_items;
+
+NOW AGGREGATING,
+
+-> SELECT department_id,substr(order_date,1,7) month_revenue,sum(order_item_subtotal) from denormalized_data where order_date like '2013%' group by department_id,substr(order_date,1,7);
+
+(THIS TAKES 26.088 SECS HENCE NOW MOST EFFICIENT HENCE WILL BE EFFECTIVE IN LARGE DATA A LOT)
+
+-> MIXED PARTITIONING
+
+IF SINGLE PARTITION THEN STRICT MODE IS SIMILAR TO STATIC
+BUT
+IF MULTIPLE PARTITIONING THEN STRICT MODE ADD VALUES
+HERE IF MODE IS STRICT THEN NESTED PARTITION WILL BE CREATED DYNAMICALLY BUT LEADING PARTITION WILL BE STATIC,HENCE IT IS A KIND OF MIXED TYPE OF PARTITIONING..
+FOR EG :
+
+-> CREATE TABLE order_partition_dynamic_strict(order_id int,order_date string,order_customer_id int,order_status string) PARTITIONED BY (order_year string,order_month string) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' STORED AS TEXTFILE;
+   
+-> set hive.exec.engine=mr;
+   set hive.exec.dynamic.partition=true;
+   set hive.exec.dynamic.partition.mode=strict;
+ 
+**CONCEPT:->(add partition value for leading column & then sub partition will be created automatically,here leading one is year and nested one is month)
+
+-> alter table order_partition_dynamic_strict add partition (order_year='2013',order_month='01') partition(order_year='2014',order_month='01');
+
+-> insert into table order_partition_dynamic_strict partition (order_year='2014',order_month) select o.*,substr(order_date,6,2) order_month from orders o where order_date like '2014%' ;
+
+-> insert into table order_partition_dynamic_strict partition (order_year='2013',order_month) select o.*,substr(order_date,6,2) order_month from orders o where order_date like '2013%' ;
+
+#NOW FOR AUTOMATIZED QUERY :-
+
+-> set hive.exec.dynamic.partition.mode=nonstrict;
+
+-> CREATE TABLE order_partition-dynamic_strict(order_id int,order_date string,order_customer_id int,order_status string) PARTITIONED BY (order_year string,order_month    string) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' STORED AS TEXTFILE;
+   
+-> insert into table order_partition-dynamic_strict partition (order_year,order_month) select *,substr(order_date,1,4) year,substr(order_date,6,2) month from orders;
+
+(HERE ALL DONE AUTOMATICALLY NO NEED TO ADD PARTITIONS)

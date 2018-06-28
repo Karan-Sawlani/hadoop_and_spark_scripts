@@ -1,0 +1,35 @@
+DOWNLOAD KAFKA
+
+>https://www.apache.org/dyn/closer.cgi?path=/kafka/1.1.0/kafka_2.11-1.1.0.tgz
+
+> tar -xzf kafka_2.11-1.1.0.tgz
+> cd kafka_2.11-1.1.0
+
+FIND PATH OF KAFKA AND THEN DO IN 
+
+vi ~/.bash_profile
+
+export KAFKA_HOME = /path_to_bin_file_f_kafka/bin 
+PATH:$PATH:$KAFKA_HOME/bin
+
+. ~/.bash_profile
+
+NOW CREATING A TOPIC
+
+kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic kafka_first_demo      
+
+NOTE : INSTEAD OF localhost IF ITS A MULTITENANT CLUSTER LIKE IN ITEVRSITY LABS OR CLOUDERA MANAGER ON A CLUSTER ( LIKE YOURS ) THEN GIVE CORRECT IP ADDRESS i.e. give ip-10-0-0-5.ec2.internal:2180 AND REST ALL NODES WHERE ZOOKEEPER IS INSTALLED FOR CLOUDERA OR HDP-SANDBOX VMS CAN USE localhost.
+
+NOW LISTING A TOPIC
+
+kafka-topics.sh --list --zookeeper localhost:2181 --topic kafka_first_demo 
+
+SEND MESSAGES
+
+kafka-console-producer.sh --broker-list localhost:9092 --topic kafka_first_demo 
+
+GETTING THE TYPED MESSAGES FROM ABOVE
+
+kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic kafka_first_demo --from-beginning
+
+NOTE : EITHER USE --bootstrap-server AS PER LATEST FLUME OR USE --zookeper FROM FLUME-0.8 AND BEFORE

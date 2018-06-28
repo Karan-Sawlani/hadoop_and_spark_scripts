@@ -1,0 +1,353 @@
+# PIG SCRIPT FOR WORDCOUNT OF UNSTRUCTURED DATA:- 
+
+lines = LOAD '/abc.txt' USING PigStorage(',') AS (line:chararray);  
+
+# THIS QUERY CREATES A BAG(RELATION) NAMED lines LOADING DATA KEPT IN HDFS using PigStorage WITH ',' AS DELIMETER
+
+describe lines;
+
+# THIS DESCRIBES SCHEMA THAT IS THERE OR NOT
+
+explain lines;
+
+# THIS GENERATES MAP-REDUCE-COMBINER PLANS FOR BAG NAMED lines HERE
+
+words = FOREACH lines GENERATE FLATTEN(TOKENIZE(line)) AS word;
+
+# THIS QUERY CREATES BAG NAMED words IT PROCESSES EACH LINE AND GENERATES FLAT TOKENS (i.e) IN EACH COLOUMN-WISE ARRANGEMENT OF EACH OF WORDS
+
+describe words;
+
+# THIS DESCRIBES SCHEMA THAT IS THERE OR NOT FOR THE BAG words
+
+explain words;
+
+# THIS GENERATES MAP-REDUCE-COMBINER PLANS FOR BAG NAMED words HERE
+
+grouped = GROUP words BY word;
+
+# THIS QUERY CREATES BAG NAMED grouped AND ALSO MAKES ALL WORDS WITH SAME VALUE OR ALL SAME WORDS GROUPED TOGETHER
+
+describe grouped;
+
+# DESCRIBES SCHEMA FOR grouped
+
+explain grouped;
+
+# THIS GENERATES MAP-REDUCE-COMBINER PLANS FOR BAG NAMED grouped HERE
+
+wordcount = FOREACH grouped GENERATE group,COUNT(words);
+
+# THIS QUERY GENERATES WORDCOUNT AND CREATES BAG NAMED wordcount
+
+describe wordcount;
+
+# DESCRIBES SCHEMA FOR grouped AND HOW IT WILL WORK
+
+explain wordcount;
+
+# THIS GENERATES MAP-REDUCE-COMBINER PLANS FOR BAG NAMED wordcount HERE
+
+DUMP wordcount;
+
+#THIS IS MOST EFFECTIVE QUERY IT ONLY GENERATES MAP-REDUCE JOBS HENCE SHOULD BE USED CAREFULLY BEFORE ALL THIS DUMP COMMAND ALL PREVIOUS COMMANDS WERE DOING LAZY-EVALUATOIN
+
+( NOW YOU WILL GET WORDCOUNT OF ALL DATA GIVEN BY YOU IN HDFS PATH )
+ 
+NOTE: THIS ALL 5 LINE QUERY CAN BE WRITTEN IN A SINGLE FILE PLACED IN LOCAL MACHINE WITH .pig EXTENSION AND THEN EXECUTE IT 
+
+BY FOR EG:- LAUNCH PIG THEN TYPE (PATH OF LOCAL FILE SYSTEM AND THEN EXEC .pig script LIKE "grunt> exec /home/user/Desktop/hah.pig")
+
+OR WITHOUT LAUNCHING PIG BY pig -e (or pig -f) /home/user/Desktop/hah.pig
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#INSTALL MYSQL
+
+sudo apt-get install mysql-server
+sudo mysql_secure_installation
+mysql -u root -p
+mysql>source retail_db.sql [DO THIS AFTER COPYING retail_db.sql]
+
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#IMPORT DATABASE USING SQOOP INTO HDFS
+
+sqoop import-all-tables \
+-m 2
+--coNnect "jdbc:mysql://localhost:3306/retail_db" \
+--username = retail_dba \
+--password = hadoop \
+--warehouse-dir = /user/root/sqoop_import
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#TRANSFORATION FOR UNSTRUCTURED AND SEMISTRUCTURED DATA SCHEMALESS EVALUATION IS USED
+
+dep = LOAD '/user/root/sqoop_import/departments' USING PigStorage(',');
+describe dep; 
+#SHOWS SCHEMA NOT KNOWN 
+dep_id = FOREACH dep GENERATE $0;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#TRANSFORMATION FOR STRUCTURED RECOMMENDED USE SCHEMA*
+
+dep = LOAD '/user/root/sqoop_import/departments' USING PigStorage(',') AS (dep_id:int,dep_name:chararray);
+describe dep; 
+#SHOWS SCHEMA 
+dep_id = FOREACH dep GENERATE dep_id;
+DUMP dep_id;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#LIMITING CONCEPT
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_phone = FOREACH cust_det GENERATE customer_phone;
+cust_phone_limit = LIMIT cust_phone 10;
+DUMP cust_phone_limit;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#TRANSFORMING ON TWO OR MORE
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_phone = FOREACH cust_det GENERATE customer_phone,customer_password;
+DUMP cust_phone;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#FILTER OPTIONS
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_filter = FILTER cust_detail BY cust_phone != 'PHONE_NUM' ;
+DUMP cust_filter;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#GROUP ALL
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_filter = FILTER cust_detail BY cust_phone != 'PHONE_NUM' ;
+cust_group = GROUP cust_filter ALL;
+DUMP cust_group;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#COUNT ON GROUP(COUNT_STAR = INcLUDES NULL VALUES ALSO IN COUNTING)
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_filter = FILTER cust_detail BY cust_phone != 'PHONE_NUM' ;
+cust_group = GROUP cust_filter ALL;
+cust_count = FOREACH cust_group GENERATE , COUNT_STAR(cust_filter) AS cnt;
+DUMP cust_count;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#MULTIPLE FILTER
+
+cust = LOAD '/user/root/sqoop_import/customers' USING PigStorage('|') AS (a:int,b:chararray,c:chararray,d:chararray,e:chararray,f:chararray,g:chararray,h:chararray,i:chararray);
+cust_null = FILTER cust BY h !='PR';
+cust_null_a = FILTER cust_null BY b != 'Mary' , c != 'Smith' ;
+cust_null_b = FILTER cust_null_a BY b != 'Mark' ;
+cust_null_group = GROUP cust_null_b ALL ;
+cust_null_count = FOREACH cust_null_group GENERATE COUNT_STAR(cust_null_c) AS CNT;
+DUMP cust_null_count;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#GROUP BY KEY
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (a:int,b:chararray,c:int,d:chararray);
+ordr_grp = GROUP ordr BY d;
+DUMP ordr_grp;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#NULL VALUES COUNT 
+
+cust_detail = LOAD '/user/root/sqoop_import/customers' USING PigStorage(',') AS (customer_id:int,customer_fname:chararray,customer_lname:chararray,customer_email:chararray,customer_password:chararray,customer_street:chararray,customer_city:chararray,customer_state:chararray,customer_zipcode:chararray);
+cust_null = FILTER cust_detail BY imei == '' ;
+OR
+cust_null = FILTER cust_detail BY ($5 is not null);
+cust_grp = GROUP cust_null ALL;
+cust_count = FOREACH cust_grp GENERATE COUNT_STAR(cust_null) AS cnt ;
+DUMP cust_count;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#SET UP PARALLEL ( SO AS TO STATE NO.REDUCERS ){VERY IMPORTANT} [CAN BE DONE ON COGROUP,GROUP,JOIN,COUNT,DISTINCT,ORDER]
+#IN DEFINED SCHEMA ALSO WE CAN USE POSITIONAL NOTATIONS.
+
+pig
+grunt>set default parallel 2;
+OR [CAN DO IN LAY EVALUATION ALSO]
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray);
+ordr_grp = GROUP ordr BY $3;
+ordr_count = FOREACH ordr_grp GENERATE group,COUNT(ordr) AS cnt PARALLEL 2;
+DUMP ordr_count;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#STORE QUERY (SAME AS DUMP AS IT GENERATES Map-Reduce JOBS)
+
+#ITS IS USED TO STORE THE DATA FROM PIG INTO HDFS
+
+#YOU CAN ACCESS HDFS BY PIG USING fs -[COMMAND OF HDFS LIKE ls,cat etc.]
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+
+# STORES DATA IN BINARY FORMAT
+
+STORE ordr INTO '/user/root/order' USING PigStorage(',');
+fs -cat /user/root/order;
+fs -rm -R /user/root/order;
+
+# NOW IF YOU DO
+
+STORE ordr INTO '/user/root/order' USING BinStorage(',');
+
+# SHOWS DATA IN GARBLED FORM
+
+# NOW IF YOU DO FROM PREVIOUS CREATED NOT DELETING IT
+
+ordr_bin = LOAD '/user/root/order' USING BinStorage(',');
+DUMP ordr_bin;
+fs -rm -R /user/root/order ;
+
+#JSON FORMAT [DIRECTLY USES METADATA WHILE COPYING DATA SO NO DELIMITER REQUIRED]
+
+STORE ordr INTO '/user/root/order' USING JsonStorage();
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#SORTING CONCEPT
+
+catg = LOAD '/user/root/sqoop_import/categories' USING PigStorage(',') AS (category_id:int,category_department_id:int,category:name:chararray);
+catg_sort = ORDER catg BY $1 ASC;
+DUMP catg_sort;
+
+#OR CAN USE DESC FOR DESCENDING ORDER SORT
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+
+#REMOVE DUPLICATE TUPPLES
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_stat = FOREACH ordr GENERATE $3 AS ordr_status;  -->> [MAY GIVE OR NOT ITS AN ALIAS]
+ordr_dist = DISTICNT ordr_status;
+DUMP ordr_dist;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#MYSQL JOINS
+
+sudo mysql -u root -p
+password:************(AS DECIDED EARLIER WHILE INSTALL)
+show databases;
+use retail_db;
+show tables;
+describe categories;
+describe customers;
+describe orders;
+describe order_items;
+describe products;
+describe departments;
+
+#NOW YOU CAN SEE ALL DATA INSIDE DATABASE
+
+#INNER JOIN
+select * from orders o join order_items oi on o.order_id = oi.order_item_order_id limit 27;
+
+#OUTER JOIN
+select * from orders o left outer join order_items oi on o.order_id = oi.order_item_order_id limit 27;
+select * from orders o right outer join order_items oi on o.order_id = oi.order_item_order_id limit 27;
+
+NEXT:----------------------------------------------------------------->>>>>>
+ 
+#PIG JOINS [NOT RUN IF SCHEMA NOT DEFINED]
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id , order_items BY order_item_order_id;
+DESCRIBE ordr_join; [TO SEE SHORT PLAN]
+EXPLAIN ordr_join; [TO SEE LONG PLAN]
+ILLUSTRATE ordr_join; [TO SEE SHORT EXPLAIN PLAN]
+DUMP ordr_join;
+
+#COUNT ON JOINS GROUP ALL
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id , order_items BY order_item_order_id;
+ordr_j_grp = GROUP ordr_join ALL;
+ordr_j_count = FOREACH ordr_j_grp GENERATE COUNT_STAR(ordr_join) AS cnt;
+
+#COUNT ON JOINS GROUP BY KEY
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id , order_items BY order_item_order_id;
+ordr_j_group = FOREACH ordr_join GENERATE orders::order_date,order_item::order_item_subtotal;
+ordr_j_count = FOREACH ordr_j_grp GENERATE group,SUM(ordr_join.ordr::order_item_subtotal) AS revenue_per_day;
+DUMP ordr_j_count;
+
+#LEFT OUTER JOIN
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id LEFT OUTER , order_items BY order_item_order_id;
+ordr_j_limit = LIMIT ordr_join 100;
+ordr_j_filtr = FILTER ordr_j_limit BY order_item::order_item_order_id IS NULL;
+ordr_j_grp = GROUP ordr_j_filtr ALL;
+ordr_j_count = FOREACH ordr_j_grp GENERATE COUNT_STAR(ordr_filtr) AS cnt;
+DUMP ordr_j_count;
+
+#RIGHT OUTER JOIN
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id RIGHT OUTER , order_items BY order_item_order_id;
+ordr_j_limit = LIMIT ordr_join 100;
+ordr_j_filtr = FILTER ordr_j_limit BY order_item::order_id IS NULL; [ AS PRI KEY SO ANS WILL BE 0 ALSO ONE TO MANY RELATION]
+ordr_j_grp = GROUP ordr_j_filtr ALL;
+ordr_j_count = FOREACH ordr_j_grp GENERATE COUNT_STAR(ordr_filtr) AS cnt;
+DUMP ordr_j_count;
+
+#REPLICATED JOIN [BY DEFAULT PIG JOIN HAPPENS ON REDUCER SIDE , TRANSFORMATION ON MAPPER SIDE BUT HERE REPLICATED IS A MAPPER SIDE JOIN , IT USES CONCEPT CALLED DISTRIBUTED CACHE]
+
+ordr = LOAD '/user/root/sqoop_import/orders' USING PigStorage(',') AS (order_id:int,order_date:chararray,order_customer_id:int,order_status:chararray) ;
+ordr_items = LOAD '/user/root/sqoop_import/order_items' USING PigStorage(',') AS (order_item_id:int,order_item_order_id:int,order_item_product_id:int,order_item_quantity:int,order_item_subtotal:float,order_item_product_price:float);
+ordr_join = JOIN ordr BY order_id , order_items BY order_item_order_id USING 'REPLICATED' ;
+ordr_transform = FOREACH ordr_join GENERATE orders::order_date,order_items:order_item:_subtotal ;
+ordr_grp = GROUP ordr_transform BY order_date;
+ordr_sum = FOREACH ordr_grp GENERATE group , SUM(ordr_join.ordr_items::order_item_subtotal) AS ordr_sm;
+EXPLAIN ordr_sum ; [YOU WILL ONLY SEE MAP PLAN AS ITS A MAP JOIN]
+DUMP ordr_sum;
+
+NEXT:----------------------------------------------------------------->>>>>>
+
+#CREATE TABLE IN HIVE REFER HIVE_SCRIPTS
+
+#THEN DO THE THINGS BELOW
+
+#MIXING OF PIG AND HIVE [NOW SCHEMA CAN BE AUTO LOADED USING HIVE CLASS HCatalog]
+
+#LOADING WITH HCatLoader()
+
+pig -use HCatalog ;
+grunt>ordr = LOAD 'retail_db.orders' USING org.apache.hive.hcatalog.pig.HCatLoader();
+DESCRIBE ordr; [ AUTOMATICALLY SHOWS SCHEMA NO NEED TO DEFINE ]
+ordr_grp = GROUP ordr BY $3;
+ordr_count = FOREACH ordr_grp GENERATE group,COUNT(ordr) AS cnt;
+DUMP ordr_count;
+
+#STORING WITH HCatStorer()
+
+pig -use HCatalog ;
+grunt>ordr = LOAD 'retail_db.orders' USING org.apache.hive.hcatalog.pig.HCatLoader();
+DESCRIBE ordr; [ AUTOMATICALLY SHOWS SCHEMA ]
+STORE ordr INTO '/user/root/orders' USING org.apache.hive.hcatalog.pig.HCatStorer();

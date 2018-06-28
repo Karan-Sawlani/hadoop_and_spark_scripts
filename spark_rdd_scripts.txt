@@ -1,0 +1,675 @@
+#To open or read files in HDFS
+
+sc-> sparkContext ( for web interfacing to track jobs ) 
+
+-> For syntax check [ help(arg) ]
+
+help(sc)->(for syntax)
+
+---->>TRANSFORMATIONS ( map, filter, flatMap, union, intersection, subtract, distinct, groupByKey, aggregateByKey, sortBykey, reduceByKey, join )
+---->>ACTIONS ( count, first, take, reduce, collect, top, takeOrdered, saveAsTextFile, saveAsSequenceFile, countByKey, foreach )
+
+-> For preview of n lines or records [ take(n) ]
+
+o=sc.textFile('/karan_practise/retail__db/orders')
+for i in o.take(4): print (i)
+
+oi=sc.textFile('/karan_practise/retail__db/order_items')
+for i in oi.take(4): print (i)
+
+-> For viewing DAG
+
+o.toDebugString()
+oi.toDebugString()
+
+-> For preview of first line [ first() ]
+ 
+o.first()
+oi.first()
+
+-> For count of records [ count() ]
+
+o.count()
+oi.count()
+
+-> For conversion to list from RDD [ collect() ] -> should not be used for big data it may result in python out of memory.
+
+oi_list = oi.collect()
+o_list = o.collect()
+
+-> For conversion back to RDD from list [ sc.parallelize(arg) ]
+
+x = [ 'hello hi how are you' , 'who are you' , 'and why are you' , 'tell me that again' ]
+x_RDD = sc.parallelize(x)
+
+oi_list_RDD = sc.parallelize(oi_list)
+o_list_RDD = sc.parallelize(o_list)
+
+-> For type checking [ type(arg) ]
+
+type(oi_list) -> list
+type(oi_list_RDD) -> pyspark.rdd.RDD
+
+-> For representation in tabular format [ sqlContext ]
+
+o_table = sqlContext.read.text('/karan_practise/retail_db/orders')
+o_table.show()
+
+o_table = sqlContext.load('/karan_practise/retail_db/orders','text')
+o_table.show()
+
+Note-> Can give any of format like(orc,json,parquet,avro(third party vendor) instead of text)
+
+#Python string manipulation to convert to lists
+
+eg : -> 
+s =" 'hello','hi,'how' " -> string
+s.split(',') -> [ 'hello' , 'hi' , 'how' ]  -> list
+
+eg : ->
+s=2013-12-01
+s.repalce( ',' , '' )
+
+#ROW LEVEL TRANSFORMATIONS [ map(lambda) , flatMap(lambda) , filter(lambda) etc.]
+
+->map (returns tuples)
+
+help(o.map)
+
+-> outputs only order_status column
+
+om = o.map(lambda a : a.split(',')[3])
+for i in om.take(4): print(i)                         
+
+-> outputs date in format tuple( (DDMMYYYY) ,order_status )
+ 
+om = o.map(lambda a : ( a.split(',')[1].replace('-','')[:7] , a.split(',')[3]))
+for i in om.take(4): print(i)
+
+Note --> All APIs require tuple format so map does it. (groupByKey(),reduceByKey(),aggregateByKey(),sortByKey(),join etc.)
+
+oim = oi.map(lambda a : (int(a.split(',')[1]) , float(a.split(',')[4])))
+for i in oim.take(4): print(i)
+
+-> flatMap (returns collection)
+
+oim = oi.flatMap(lambda a : (int(a.split(',')[1]) , float(a.split(',')[4])))
+for i in oim.take(4): print(i)
+
+Note-> 
+
+In map it returned -> 
+(1, 299.98000000000002)
+(2, 199.99000000000001)
+(2, 250.0)
+(2, 129.99000000000001)
+-> type is RDD
+
+In flatMap it returned ->
+1
+299.98000000000002
+2 199.99000000000001
+-> type is RDD
+
+eg: ->
+
+x = [ 'hello hi how are you' , 'who are you' , 'and why are you' , 'tell me that again' ]
+x_RDD = sc.parallelize(x)
+
+x_RDD_flat = x_RDD.map(lambda a : a.split(' '))
+for i in x_RDD_flat.take(10): print(i)
+
+-> 
+['hello', 'hi', 'how', 'are', 'you']
+['who', 'are', 'you']
+['and', 'why', 'are', 'you']
+['tell', 'me', 'that', 'again']
+
+
+x_RDD_flat = x_RDD.flatMap(lambda a : a.split(' '))
+for i in x_RDD_flat.take(10): print(i)
+
+->
+hello
+hi
+how
+are
+you
+who
+are
+you
+and
+why
+
+-> filter (returns boolean value)
+
+Note :-> we always do things in int or float because string is not so fast as them.
+
+o_complete = o.filter(lambda a : a.split(',')[3]=='COMPLETE')
+for i in o_complete.take(10): print(i)
+
+o_complete_closed = o.filter(lambda a : (a.split(',')[3]=='COMPLETE' or a.split(',')[3]=='CLOSED'))
+for i in o_complete_closed.take(10): print(i)
+o_complete_closed.count() -> 30455
+
+o_complete_closed_dates = o.filter(lambda a : (a.split(',')[3]=='COMPLETE' or a.split(',')[3]=='CLOSED') and a.split(',')[1][:7]=='2013-07')
+for i in o_complete_closed_dates.take(10): print(i)
+o_complete_closed_dates.count() -> 676
+
+o_complete_closed_dates= o.filter(lambda a:a.split(',')[3] in ['CLOSED','COMPLETE'] and a.split(',')[1][:7]=='2013-07')
+for i in o_complete_closed_dates.take(10): print(i)
+
+-> join (takes in 2 tuples (k,v) and (k,u) returns ( k, (v,u) )
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),float(a.split(',')[4])))
+for i in oim.take(10): print(i)
+
+om = o.map(lambda a : (int(a.split(',')[0]),float(a.split(',')[2])))
+for i in om.take(10): print(i)
+
+o_join_oi = om.join(oim)
+for i in o_join_oi.take(12): print(i)
+
+o_left_outer_join_oi = om.leftOuterJoin(oim)
+for i in o_left_outer_join_oi.take(12): print(i)
+o_left_outer_join_oi.count() -> 183650
+
+
+o_right_outer_join_oi = oim.rightOuterJoin(om) -> [ check this is different from left outer one ]
+for i in o_right_outer_join_oi.take(12): print(i)
+o_right_outer_join_oi.count() -> 183650
+
+Note :-> While performing joins default is inner join it discards the records that are in parent but not in child but in left/right Outer all records are there nothing discarded and hence for left outer parent must be in left and child on right similarly for right paent on right and child left.
+
+Now if wanna filter from this join the null values .
+
+oljf = o_left_outer_join_oi.filter(lambda a : a[1][1]==None)
+oljf.count() -> 11452 (183650 - 172198 = 11452 null values)
+
+orjf = o_right_outer_join_oi.filter(lambda a : a[1][0]==None)
+orjf.count() -> 11452 (183650 - 172198 = 11452 null values)
+
+-> Aggregations
+
+-> reduce (for aggregations like add,min,max,etc)
+
+-> add
+
+from operator import add
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),float(a.split(',')[4])))   -> filters the 2nd and 5th column in form of tuples( can also do by without doing map first directly do filter )
+oimf = oim.filter(lambda a : int(a[0])==2)                                   -> filters rows only with first tuple value = 2
+oimfm = oimf.map(lambda a : a[1])                                           -> filters only 2nd tuple values on when the first tuple will be 2 
+oimfmr = oimfm.reduce(add)                                                   -> adds all the values of the filtered and gives output 579.98
+print(oimfmr)                                                                            -> prints out value 579.98
+ 
+OR
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),float(a.split(',')[4])))
+oimf = oim.filter(lambda a : int(a[0])==2)  
+oimfm = oimf.map(lambda a : a[1])                                 
+oimfmr = oimfm.reduce(lambda x,y : x+y )                                         -> (cant do directly as sum is different in for string and int or float)
+print(oimfmr)
+
+-> min
+
+oif = oi.filter(lambda a : int(a.split(',')[1])==2)
+oifm = oif.map(lambda a : a.split(',')[5])
+oifmr = oifm.reduce(lambda x,y : x if x<y else y)                                 -> gives only minimum value of order_revenue by order_item_order_id = 2 
+print(oifmr)
+
+OR
+
+oif = oi.filter(lambda a : int(a.split(',')[1])==2)
+oifr = oif.reduce(lambda x,y : x if x.split(',')[4]<y.split(',')[4] else y)
+print(oifr)                                                                                            -> gives full row with minimum value of order_revenue by order_item_order_id = 2 (as only comparison done so we can do directly                                                                                                                            without map before)
+
+
+-> countByKey (not used or used rarely coz it takes in paired RDD i.e. tuple and gives the dictionary as output so to process it in spark is againg need to convert and is a bit challenging )
+
+o_status = o.map(lambda a : (a.split(',')[3],1))    -> give 1 or any other value at the end of second value in tuple output will be same it is just to satisfy syntax only
+os_count = o_status.countByKey()
+print (os_count) 
+
+type(os_count) -> dictionary not RDD
+
+Note :-> This countByKey() is not used as it wil be dangerous to use if Big Data is there as it is python type so same reason as collect() that why it is not used?
+
+-> groupByKey (here it is least preffered as it not uses combiner logic)
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),float(a.split(',')[4])))
+oimg = oim.groupByKey()
+for i in oimg.take(10): print(i)
+ 
+Note :-> output comes in form of tuple with RDD's (2,<pyspark.rdd.RDD>) and so on...) to view that <pyspark-------> thing do :->
+
+oimg_first = oimg.first()
+l[0] -> ( gives 2 )
+list(l[1]) -> ( gives [199.00,299.90,129.98] and so on etc.)   
+sum(oimg_first[1]) -> results in 381.89999999999998
+
+oimgm = oimg.map(lambda a : (a[0],round(sum(a[1],2)))                                  -> gives sum of all inside that RDD of grouped by order_item_order_id
+for i in oimgm.take(10): print(i)
+
+oim_all = oi.map(lambda a : (int(a.split(',')[1]),a))
+oimg_all = oim_all.groupByKey()
+for i in oimg_all.take(10): print(i)
+
+Note :-> python concept of sorted(list, function, reverse = True) for eg:-> sorted(l[1], lambda a : a.split(',')[4], reverse=True)  -> will sort the data in the formmt of RDD and return a collection itself so use                    flatMap instead of map.
+
+oimg_all_map_sorted = oimg_all.map(lambda a: sorted(a[1], key = lambda s:float(s.split(',')[4]) ,reverse = True)) 
+for i in oimg_all_map_sorted.take(4): print(i)                                                  
+                                                                                                          
+oimg_all_flatMap_sorted = oimg_all.flatMap(lambda a: sorted(a[1], key = lambda s:float(s.split(',')[4]) ,reverse = True)) 
+for i in oimg_all_flatMap_sorted.take(4): print(i) 
+
+Note :-> map before before groupByKey is to convert to (K,V) but map/flatMap after it is to do transformations like sorting or aggregations etc.
+
+oimg_all_map_sorted gives the list by order_item_order_id and each list has one or more than one string rows
+
+[u'61531,24576,403,1,129.99,129.99', u'61530,24576,771,3,119.97,39.99', u'61533,24576,1014,2,99.96,49.98', u'61532,24576,926,2,31.98,15.99']
+[u'91992,36864,502,4,200.0,50.0', u'91994,36864,403,1,129.99,129.99', u'91993,36864,502,2,100.0,50.0', u'91995,36864,502,1,50.0,50.0']
+[u'20471,8196,1004,1,399.98,399.98', u'20469,8196,365,5,299.95,59.99', u'20470,8196,403,1,129.99,129.99', u'20472,8196,365,2,119.98,59.99']
+[u'40935,16392,1004,1,399.98,399.98', u'40936,16392,365,2,119.98,59.99', u'40937,16392,502,2,100.0,50.0']
+
+oimg_all_flatMap_sorted gives the only records in each lines each line with each row                          
+
+61531,24576,403,1,129.99,129.99
+61530,24576,771,3,119.97,39.99
+61533,24576,1014,2,99.96,49.98
+61532,24576,926,2,31.98,15.99
+
+-> reduceByKey ( most relevant and used frequently takes lambda and returns paired RDD )
+ 
+from operator import add
+oim = oi.map(lambda a: (int(a.split(',')[1]),float(a.split(',')[4])))
+oim_reduce_by_key_add = oim.reduceByKey(add)
+for i in oim_reduce_by_key_add.take(10): print(i)             -> prints sum of each record grouped by order_item_order_id same as groupByKey but there we got RDD hence need to perform sum(RDD) for                                                                                                         result
+OR 
+
+for sum:
+oim = oi.map(lambda a: (int(a.split(',')[1]),float(a.split(',')[4])))
+oim_reduce_by_key_add = oim.reduceByKey(lambda x,y : x+y)
+for i in oim_reduce_by_key_add.take(10): print(i)
+
+for minimum:
+oim = oi.map(lambda a: (int(a.split(',')[1]),float(a.split(',')[4])))
+oim_reduce_by_key_min = oim.reduceByKey(lambda x,y : x if x<y else y)
+for i in oim_reduce_by_key_min.take(10): print(i)
+
+for all values in tuple that is whole string instead of only order_item_order_id and revenue:
+oim = oi.map(lambda a : (int(a.split(',')[1]),a))
+oim_all_reduce_by_key_min = oim.reduceByKey(lambda x,y:x if float(x.split(',')[4])<float(y.split(',')[4]) else y)
+for i in oim_all_reduce_by_key_min.take(10): print(i)
+
+-> aggregateByKey ( it is used when combiner logic i.e computing intermediate values and reducer logic i.e. computing final values,it takes in an initial value with 2 lambda functions different for different                                logics,takes paired RDD (K,V) and returns (K,U) here (K,U) may be of different data types but in reduceByKey it is of same data type)
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),float(a.split(',')[4]))) 
+revenue_per_oi_with_count = oim.aggregateByKey((0.0,0),lambda x,y : (x[0]+y,x[1]+1),lambda x,y : (x[0]+y[0],x[1]+1))
+for i in revenue_per_oi_with_count.take(10): print(i)
+
+Explianation : -> required output (2,(579.98,3)) as 2 comes 3 times so....
+
+(2,199.99)
+(2,250.00)
+(2,129.99)
+
+In first lambda function x is (0.0,0) and y is 199.99 now returns (2,(199.99+0.0,0+1)) i.e. (199.99,1) and now x is this and y is 250.0 ->  (449.99,2) and 129.99 so if let us assume that now it is not processed
+so hence now it will go in next lambda function  here are two intermediate values (2, (449.99,2)) , (2, (129.99,1)) so In second lambda function x , y here x and y both are of output value type here tuple.   
+
+Syntax :-> aggregateByKey(initial value is output value type,lambda [x,y (here x is output value (value is of key,value one )here it is tuple and y is input value here it is float)],lambda [x,y (both x and y are                  of tuple i.e. output value.) ])
+
+-> groupByKey(it is not used more as it not uses combiner logic so its perfomance is degraded used only if reduceByKey or agrregateByKey not works.)
+
+-> sortByKey (both input and output are paired RDD)
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pm = p.map(lambda a : (a.split(',')[4],a))
+pmf = p.filter(lambda a : a[1].split(',')[4]=="")
+pmfs = pmf.sortByKey()
+for i in pmfs.take(12): print(i)
+
+OR
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pfm = pf.map(lambda a: (a.split(',')[4],a))
+pfms = pfm.sortByKey()
+for i in pfms.take(10): print(i)
+
+-> Composite key sorting product_category in asc and product_price in desc ( (K1,K2) , V )
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pf_composite_key_m = pf.map(lambda a : ((int(a.split(',')[1]),float(a.split(',')[4])),a))
+pf_composite_key_m_sort = pf_composite_key_m.sortByKey()                                         -> sorts both keys in ascending that is take the first key then sort it in ascending and after that taking first key 	for i in pf_composite_key_m_sort.take(8): print(i)                                                                   in reference does another key sort in ascending
+
+pf_composite_key_m_sort = pf_composite_key_m.sortByKey(False)                                         -> both keys in descending
+for i in pf_composite_key_m_sort.take(8): print(i)
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pf_composite_key_m = pf.map(lambda a : ((int(a.split(',')[1]),-float(a.split(',')[4])),a))             
+pf_composite_key_m_sort = pf_composite_key_m.sortByKey()
+for i in pf_composite_key_m_sort.take(8): print(i)
+
+Note :-> sorts both key in ascending but here the thing comes is the other key is given negative value so the ascending of negative will automatically be descending
+
+Similarly for descending of first and ascending of second
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pf_composite_key_m = pf.map(lambda a : ((int(a.split(',')[1]),-float(a.split(',')[4])),a))             
+pf_composite_key_m_sort = pf_composite_key_m.sortByKey(False)
+for i in pf_composite_key_m_sort.take(8): print(i)
+
+pf_composite_key_m_sort_map = pf_composite_key_m_sort.map(lambda a:a[1])
+for i in pf_composite_key_m_sort_map.take(8): print(i)
+
+# RANKING (as in sorting it is categorised into global or groupBy(per group) )
+
+-> Global Ranking ( (map->sort->map->take), (takeOrdered) ,(top) )
+
+-> (map->sort->map->take)
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pfm = pf.map(lambda a: (a.split(',')[4],a))
+pfms = pfm.sortByKey()
+pfmsm = pfms.map(lambda a : a[1])
+for i in pfms.take(10): print(i)
+
+-> (top) -> sorts in descending order same work as done by (map->sort->map->take) [top takes in no. of records,key = lambda function]
+                  and sorts in desceding order
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pf_top = pf.top(8,key = lambda a : float(a.split(',')[4]))
+print(pf_top) -> type -> list
+
+ -> (takeOrdered) -> sorts in ascending order same work as done by (map->sort->map->take) [takeOrdered takes in no. of records,key = lambda function]
+                  and sorts in ascending order
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pf_take_ordered = pf.takeOrdered(8,key = lambda a : float(a.split(',')[4]))
+print(pf_take_ordered) -> type -> list
+
+Note :-> Here also the -ve sign concept will work.
+              Here if more than one same keys are there then sort randomly between them so in this case groupByKey is needed.
+
+-> groupByKey Ranking (here used groupByKey() followed by flatMap) 
+
+as previously seen groupByKey takes in tuple or paired RDD and returns paired RDD with same key and collection like <pyspark.rdd.RDD>
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pfm = pf.map(lambda a: (int(a.split(',')[1]),a))
+pfmg = pfm.groupByKey()
+pfmg_fm = pfmg.flatMap(lambda a: sorted(a[1],key=lambda x: float(x.split(',')[4]),reverse=True))
+for i in pfmg_fm.take(10): print(i)
+
+pfmg_fm = pfmg.flatMap(lambda a: sorted(a[1],key=lambda x: float(x.split(',')[4]),reverse=True)[:3]) -> To give list of top 3 elements of each category
+
+pfmg_fm_m = pfmg_fm.map(lambda a : (a.split(',')[4],a.split(',')[1]))
+for i in pfmg_fm_m.take(60): print(i)                                                              Trick(1)-> to revaluate easily the answer
+for i in pfmg_fm.take(60): print(i.split(',')[4],i.split(',')[1])                                Trick(2)-> to revaluate easily the answer
+
+Now -> 
+
+# LETS SAY IF WE WANT TO FIND THE TOP N PRODUCT_PRICED ELEMENTS GROUPED BY PRODUCT_ID i.e. OF PARTICULAR PRODUCT_ID FIND TOP N PRODUCT PRICED ELEMENTS
+
+-> here lambda function has certain limitations so cant do by lambda directly
+
+t = pfmg.filter(lambda a:a[0]==59).first()
+l = sorted(t[1],key = lambda a:float(a.split(',')[4]),reverse=True)
+x = map(lambda a : float(a.split(',')[4]),l)
+s_top3 = sorted(set(x),reverse=True)[:3]
+for i in s_top3: print(i)
+import itertools as it
+z = it.takewhile(lambda a: float(a.split(',')[4]) in s_top3,l)
+for i in it.takewhile(lambda a: float(a.split(',')[4]) in s_top3,l): print(i)
+print(list(z))
+
+
+Explaination :-> it takes the first tuple then extract sorted l[1] i.e. RDD part out of it and then extracts useful values via map that we want to look up to and then do set so as to remove duplicates and then                             sort it by descending order that is reverse = True now for top 3 give the slicing of index range so as to limit it to 3 elements only.Now another one is sorted on two sides one on l and
+                          another on s_top3 because if not do then it orientations i.e. if only sorted then it changes to ascending order if not given sorted then in random or in ascending also if one is sorted in                                  ascending and another sorted not given then also it fails and returns empty list(z) ->  []. Now, itertools is third party so need to import it is used to reduce time as it runs while till the                                    conditon is satisfied then break.
+
+def countTopN_ByPrice(get_RDD,topN):
+ list_conversion = sorted(get_RDD[1],key = lambda a: float(a.split(',')[4]),reverse=True)
+ RDD_map = map(lambda k : float(k.split(',')[4]),list_conversion)
+ s_topN = sorted(set(RDD_map),reverse=True)[:topN]
+ import itertools as it
+ return it.takewhile(lambda o: float(o.split(',')[4]) in s_topN,list_conversion)
+ 
+
+pfmgt = pfmg.flatMap(lambda a: countTopN_ByPrice(a,3))
+for i in pfmgt.take(28): print(i.split(',')[1],i.split(',')[4],i.split(',')[2])
+
+-> Solution in all :->
+
+
+def countTopN_ByPrice(get_RDD,topN):
+ list_conversion = sorted(get_RDD[1],key = lambda a: float(a.split(',')[4]),reverse=True)
+ RDD_map = map(lambda k : float(k.split(',')[4]),list_conversion)
+ s_topN = sorted(set(RDD_map),reverse=True)[:topN]
+ import itertools as it
+ return it.takewhile(lambda o: float(o.split(',')[4]) in s_topN,list_conversion)
+
+p = sc.textFile('/karan_practise/retail_db/products')
+pf = p.filter(lambda a: a.split(',')[4]!="")
+pfm = pf.map(lambda a: (int(a.split(',')[1]),a))
+pfmg = pfm.groupByKey()
+pfmgt = pfmg.flatMap(lambda a: countTopN_ByPrice(a,3))
+for i in pfmgt.take(18): print(i.split(',')[1],i.split(',')[4],i.split(',')[2])
+
+-> output is :->
+
+(u'24', u'229.99', u'Callaway X Hot Laser Rangefinder')
+(u'24', u'189.99', u"PUMA Men's evoPOWER 1 Tricks FG Soccer Cleat")
+(u'24', u'159.99', u'adidas Brazuca 2014 Official Match Ball')
+(u'36', u'24.99', u"Hirzl Women's Trust Feel Golf Glove")
+(u'36', u'24.99', u"Hirzl Women's Trust Control Golf Glove")
+(u'36', u'24.99', u"Glove It Women's Violet Bling Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Urban Brick Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Versailles Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Navy Clear Dot Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Pink Clear Dot Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Olive Bling Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Silver Bling Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Imperial Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Red Clear Dot Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Hot Pink Bling Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Calypso Golf Glove")
+(u'36', u'19.99', u"Glove It Women's 19th Hole Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Mod Oval Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Silver Willow Golf Glove")
+(u'36', u'19.99', u"Glove It Women's Trellis Golf Glove")
+(u'36', u'17.99', u"Hirzl Men's Soffft Flex Golf Glove")
+ 
+-> SET OPERATIONS (union,subtract,intersection)
+
+->filter->join
+
+o = sc.textFile('/karan_practise/retail_db/orders')
+o_2013_12 = o.filter(lambda a: a.split(',')[1][:7]=='2013-12').map(lambda a : (int(a.split(',')[0]),a))
+o_2014_01 = o.filter(lambda a: a.split(',')[1][:7]=='2014-01').map(lambda a : (int(a.split(',')[0]),a))
+oi = sc.textFile('/karan_practise/retail_db/order_items')
+oim = oi.map(lambda a :(int(a.split(',')[1]),a))
+o_2013_12_j = o_2013_12.join(oim)
+o_2014_01_j = o_2014_01.join(oim)
+oi_2013_12 = o_2013_12_j.map(lambda a:a[1][1])           -> full joined dataset (key(order_id) , (rows of orders,rows of order_items))
+oi_2014_01 = o_2014_01_j.map(lambda a:a[1][1])
+for i in oi_2014_01.take(5): print(i)                                  -> order_items full rows where order_date is 2013-12
+for i in oi_2013_12.take(8): print(i)                                  -> order_items full rows where order_date is 2014-01
+
+-> union (always used with distinct)
+
+oi_2013_12_product_id = oi_2013_12.map(lambda a: int(a.split(',')[2]))
+oi_2014_01_product_id = oi_2014_01.map(lambda a: int(a.split(',')[2]))
+
+all_union = oi_2013_12_product_id.union(oi_2014_01_product_id)
+for i in all_union.take(8): print(i)
+
+all_union_distinct = all_union.distinct()
+for i in all_union_distinct.take(9): print(i)
+
+oi_2014_01_product_id.count() -> 14666
+oi_2013_12_product_id.count() -> 14729
+all_union.count()                        -> 29395
+all_union_distinct.count()          -> 100
+ 
+-> intersection (no need of distinct as it is implicitly built in)
+
+all_intersection = oi_2013_12_product_id.intersection(oi_2014_01_product_id)
+for i in all_intersection.take(9): print(i)
+
+all_intersection.count()              -> 98
+
+Note :-> in union distinct we got 100 records and in intersection we got 98 records so here 2 records are there they may be in either of one i.e. may be in 2013 or in 2014 so now find out.
+
+->subtract (set operation in spark for minus needs distinct)
+
+only_2013 = oi_2013_12_product_id.subtract(oi_2014_01_product_id) -> 127 127 127 (vertically)
+only_2014 = oi_2014_01_product_id.subtract(oi_2013_12_product_id) -> 58 58 (vertically)
+
+only_2013_distinct = oi_2013_12_product_id.subtract(oi_2014_01_product_id).distinct() -> 127
+for i in only_2013_distinct.take(9): print(i)
+only_2014_distinct = oi_2014_01_product_id.subtract(oi_2013_12_product_id).distinct() -> 58
+for i in only_2014_distinct.take(9): print(i)
+
+# SAVE DATA IN HDFS
+
+-> TEXT FILE -> saveAsTEextFile(path,compressionCodecClass)
+
+oim = oi.map(lambda a:(int(a.split(',')[1]),float(a.split(',')[4])))
+oim_sum = oim.reduceByKey(lambda x,y:x+y)
+oim_sum_format = oim_sum.map(lambda a:str(a[0])+'\t'+str(a[1]))
+for i in oim_sum_format.take(4): print(i) 
+
+-> output comes is ->
+
+24576   381.9
+36864   479.99
+8196    949.9
+16392   619.96
+
+help(oim_sum_format.saveAsTextFile)
+
+oim_sum_format.saveAsTextFile('/karan_practise/saving_data') -> a location in hdfs should not already exists else gives error.
+
+m = sc.textFile('/karan_practise/saving_data')
+for i in m.take(4): print(i)                                        -> to check or validate
+
+-> COMPRESSION
+
+Note :-> Check for the compression algos in by ' vi /etc/hadoop/conf/core-site.xml ' -> org.apache.hadoop.io.compress.SnappyCodec, org.apache.hadoop.io.compress.DefaultCodec,               org.apache.hadoop.io.compress.GzipCodec
+
+oim_sum_format.saveAsTextFile('/karan_practise/saving_data_compress',compressionCodecClass='org.apache.hadoop.io.compress.SnappyCodec')
+m = sc.textFile('/karan_practise/saving_data_compress')
+for i in m.take(4): print(i)  
+
+-> OTHER FILE FORMATS -> (ORC, PARQUET, JSON, AVRO(third party from databricks))
+
+Note :-> These are industry level standard file formats and can be viewed by sqlContext here firstly RDD msut be changed to DataFrame using API toDF and then read data in form of dataframe directly                     and format can then be changed.
+
+-> help(oim_sum_format.toDF)
+
+oim_sum = oim.reduceByKey(lambda x,y:x+y)
+oim_sum_round=oim_sum.map(lambda a : (a[0],round(a[1],2)))
+oim_DF = oim_sum_round.toDF(schema = ['order_id','order_sum'])
+oim_DF.show()
+
+-> SAVING FILE IN JSON FORMAT
+
+oi = sc.textFile('/karan_practise/retail_db/order_items')
+oim = oi.map(lambda a:(int(a.split(',')[1]),float(a.split(',')[4])))
+oim_sum = oim.reduceByKey(lambda x,y:x+y)
+oim_sum_round=oim_sum.map(lambda a : (a[0],round(a[1],2)))
+oim_DF = oim_sum_round.toDF(schema = ['order_id','order_sum'])
+oim_DF.write.json('/karan_practise/retail_db/oi_in_json')                                            -> saves file
+oim_DF.write.json('/karan_practise/retail_db/oi_in_json',compression = 'snappy') 
+json_file = sqlContext.read.json('/karan_practise/retail_db/oi_in_json')                     -> views file
+json_file.show()
+
+-> SAVING FILE IN PARQUET FORMAT
+
+oim_DF.write.parquet('/karan_practise/retail_db/oi_in_parquet')
+oim_DF.write.parquet('/karan_practise/retail_db/oi_in_parquet',compression = 'snappy')     -> can give class name also either of one available are (gzip,lz4,deflate,none,snappy,bzip2)
+parquet_file = sqlContext.read.parquet(('/karan_practise/retail_db/oi_in_parquet') 
+parquet_file.show()
+
+-> SAVING FILE IN ORC FORMAT
+
+oim_DF.write.orc('/karan_practise/retail_db/oi_in_orc')
+oim_DF.write.orc('/karan_practise/retail_db/oi_in_orc',compression = 'gzip')
+orc_file = sqlContext.read.orc('/karan_practise/retail_db/oi_in_orc')
+orc_file.show()
+
+Note :-> order_items is actually of size 5.2M , oi_in_json is 2.1M , oi_in_parquet is 421.2K , oi_in_orc is 403.4K hence size is also low now we can compress it also.
+
+
+
+
+ofm = o.filter(lambda a:a.split(',')[3] in ['CLOSED','COMPLETE']).map(lambda a : (int(a.split(',')[0]),a.split(',')[1][:10]))
+for i in ofm.take(4): print(i)
+
+oim = oi.map(lambda a : (int(a.split(',')[1]),(int(a.split(',')[2]),float(a.split(',')[4]))))
+for i in oim.take(4): print(i)
+
+o_oi_j = ofm.join(oim)
+for i in o_oi_j.take(4): print(i)
+
+
+
+
+o = sc.textFile('/karan_practise/retail_db/orders')    
+o_status_filter_id_date_map = o.filter(lambda a:a.split(',')[3] in ['CLOSED','COMPLETE']).map(lambda a : (int(a.split(',')[0]),(a.split(',')[3],a.split(',')[1][:10])))
+for i in o_status_filter_id_date_map.take(4): print(i)
+
+(1, (u'CLOSED', u'2013-07-25'))
+(3, (u'COMPLETE', u'2013-07-25'))
+(4, (u'CLOSED', u'2013-07-25'))
+(5, (u'COMPLETE', u'2013-07-25'))
+
+oi = sc.textFile('/karan_practise/retail_db/order_items')    
+oi_id_product_id_subtotal_map = oi.map(lambda a : (int(a.split(',')[1]),(int(a.split(',')[2]),float(a.split(',')[4]))))
+for i in oi_id_product_id_subtotal_map.take(4): print(i)
+
+(1, (957, 299.98000000000002))
+(2, (1073, 199.99000000000001))
+(2, (502, 250.0))
+(2, (403, 129.99000000000001))
+
+o_join_oi = o_status_filter_id_date_map.join(oi_id_product_id_subtotal_map)
+for i in o_join_oi.take(4): print(i)
+
+(13656, ((u'COMPLETE', u'2013-10-17'), (957, 299.98000000000002)))
+(13656, ((u'COMPLETE', u'2013-10-17'), (403, 129.99000000000001)))
+(24, ((u'CLOSED', u'2013-07-25'), (403, 129.99000000000001)))
+(24, ((u'CLOSED', u'2013-07-25'), (502, 50.0)))
+
+filter_subtotal_product_id_extract_two_keys = o_join_oi.map(lambda a : ((a[1][0][1],a[1][1][0]),a[1][1][1]))
+for i in filter_subtotal_product_id_extract_two_keys.take(4): print(i)
+
+((u'2013-10-17', 957), 299.98000000000002)
+((u'2013-10-17', 403), 129.99000000000001)
+((u'2013-07-25', 403), 129.99000000000001)
+((u'2013-07-25', 502), 50.0)
+
+daily_revenue_per_product_id = filter_subtotal_product_id_extract_two_keys.reduceByKey(lambda x,y:x+y)
+for i in daily_revenue_per_product_id.take(4): print(i)
+
+((u'2013-12-05', 642), 240.0)
+((u'2013-12-20', 311), 109.95)
+((u'2013-11-19', 24), 239.97)
+((u'2014-02-25', 1014), 4148.3400000000001)
+
+fil =  daily_revenue_per_product_id.filter(lambda a:a[0][0]=='2014-07-14')      -> checking so here by each date each order_subtotal is there with each product_id.
+for i in fil.take(4): print(i)
+
+((u'2014-07-14', 642), 150.0)
+((u'2014-07-14', 906), 49.979999999999997)
+((u'2014-07-14', 403), 3249.7499999999995)
+((u'2014-07-14', 172), 30.0)
+
+
+

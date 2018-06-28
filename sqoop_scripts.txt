@@ -1,0 +1,308 @@
+#SQOOP IS A TOOL FOR EXPORTING AS WELL AS IMPORTING OF DATA FROM OR INTO HDFS RESPECTIVELY ( MAY NOT INCLUDE '=' SIGN ALSO DEPENDS..!!! )
+
+#LISTING THE DATABASES OF A PARTICULAR 
+USER
+
+sqoop list-databases \
+--connect "jdbc:mysql://localhost:3306" \ [USED FOR CONNECT TO MYSQL]
+--username=retail_dba \                   [USERNAME YOU CREATED]
+--password=hadoop 
+                        [PASSWORD]
+
+#LISTING THE TABLES OF A PARTICULAR 
+DATABASE
+
+sqoop list-tables \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username=retail_dba \
+--password=hadoop 
+
+#ACCESSING MYSQL DATABASE QUERY [OR ANY OTHER DATABASE MAY BE ORACLE OR ETC.] BY SQOOP
+
+sqoop eval \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username=retail_dba \
+--password=hadoop \
+--query "select* from departments"        [SELECTS QUERY]
+
+#SQOOP FILE FORMATS
+
+--as-avrodatafile (if choosen this format .avsc files will be created as it is also pig like client only tool so .avsc is created on directory in which you are                           working and these extensions created stores metadta of table cat to see it in json format)
+--as-sequencefile
+--as-textfile     (here .java files created eg. customers.java etc .. these extensions contains metadata of table created.. here shows java code)
+
+#IMPORT-ALL-TABLES(here in avro format)
+
+sqoop import-all-tables \
+-m 12 \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username=retail_dba \
+--password=hadoop \
+
+-as-avrodatafile \
+--warehouse-dir=/user/hive/warehouse/xademo.db [STORES DATA THAT YOU SPECIFY IN WAREHOUSE DIRECTORY]
+
+#IMPORT-ALL-TABLES(hive table connect)
+
+sqoop import-all-tables \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--num-mappers 1 (or -m 1)
+--username retail_dba \
+--password hadoop \
+--hive-import \                                     (tells sqoop to have import in hive tables)
+--hive-overwrite \                                  (if import on existing table and overwrite i.e. clean and then reload if not used overwrite then append happens)
+--create-hive-table \                                                            
+--outdir java_files   
+
+-> --hive-delims-replacement(for replacement of delimiters)
+   --hive-drop-import-delims(drop those special characters like '\n','\s' etc..!!)
+   --hive-partition-key(to load data in hive partition key..!!!)
+
+-> (optional give or dont it just creates folder named java_files to store all sample_table.java files eg categories.java else all 6 .java files                           will be in from where you have run sqoop commands in local file system just like all client tools like pig log files..!! )
+
+-> (now can directly launch hive and chech warehouse directory that has following data of above and also can select * from departments and etc... eg hive> show tables;    shows all tables)
+
+# create compession
+
+sqoop import-all-tables \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+-m 2
+--username retail_dba \
+--password hadoop \
+--hive-import \
+--hive-overwrite \
+--create-hive-table \
+--hive-database xademo \       (for specific database you created say xademo...!!! if not give then uses default)
+--compress \
+--compression-codec org.apache.io.compress.SnappyCodec \  (default is gzip)
+--outdir java_files_collection
+
+-> (file comes in .snappy format i.e. zipped format and size is compressed for eg: order_items 5.2M after compress 1.8M also when dfs -ls /user/hive/warehouse/*.snappy    O/P comes in garbled format)
+
+-> (for import-all-tables use warehouse-dir and for simple import use target-dir)
+
+-> (for hive-import not use warehouse-dir it automatically does load it for you and create table)
+
+#import on hive by sqoop
+
+-> here table is first created in hive and then after that it is imported by sqoop in that directory say create in database xademo table departments so....!!!!
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--num-mappers 1 (or -m 1)
+--username retail_dba \
+--password hadoop \
+--table departments \
+--hive-home /usr/hive/warehouse \      (optional to give cz by default it is warehouse directory only)
+--hive-import \
+--hive-table xademo.departments \
+--hive-overwrite
+
+-> (in hive default delimiter is null character and hence represented by \u0001 but new-line character is default in both hive and sqoop but if you hdfs dfs -cat the      path by described formatted on hive table you will see garbled value cz of null character in ascii looks garbled to see actually how it looks lke you have to    copy it to local fs by get command and then vi "departments" and then you will see '^A' in vi editor that is representation of null value and also in ascii it is    '\001' (see at bottom of page how to use it with export) hence no major issues in import but if want to export from hive to mysql you will run into issues unless    you dont have knowledge of delimiter changes)
+
+-> *( NOTE : If use plain sqoop import with no --hive-import,--hive-table,--create-hive-table and etc of all hive parameters of sqoop ans simply using the warehouse
+    dir of hive as simple target-dir dealing it like ordinary file path in hdfs although import will be done but contradiction arises b/w comma for sqoop and null for      hive as you have already created table in hive named say "dep" when after above you do select * from dep all NULLS are shown)*
+
+-> here table is create simultaneously with sqoop import
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--num-mappers 1 (or -m 1)
+--username retail_dba \
+--password hadoop \
+--table departments \
+--hive-import \
+--hive-table xademo.departments \
+--create-hive-table
+
+# null string  and null non-string representation in sqoop
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--num-mappers 1 (or -m 1)
+--username retail_dba \
+--password hadoop \
+--table departments \
+--hive-import \
+--hive-table xademo.departments \
+--create-hive-table \
+--null-string haha \
+--null-non-string -1
+
+-> ( Note : here there are null values hence no primary key is there so have to use --split-by or -m 1 so hence it is used as above and also all null values will be       represented by haha and the null-non-string values say integer values that are null will be by -1 for eg: lets say values in mysql are 2,football and null,null now     it imports on hive will be represented by 2,football and -1,haha)
+
+# import command in sqoop
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr (make sure that '/usr' not exists already if it does then delete it..!! then can see by hdfs dfs -cat /usr/part* O/P comes out)
+
+#boundary queries
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr \
+--boundary-query "select min(department_id),max(department_id) from departments limit 1" (as default may also no give works as it) 
+
+-> (boundary query is used to define algo that is used by sqoop internally it does splits or makes threads as per values given for eg: as follows : 
+-> if table has primary key then simply give no. of mappers lets say given -m 2, now it will divide table import procedure into two parts one will contain (2 Fitness,3    Footwear,4 Apparel) as part-m-00000 and rest another file will contain (5 Golf,6 Outdoors,7 Fan Shop) as part-m-00001 and now 
+-> if give -m 3 then all 3 files will have 2 values each but now 
+-> if we add value 8000,test to it and -m 2 then according to default boundary query it will divide as folows (min value + max value)/no. of mappers here => (2+8000)/2
+   = 4001 that means records with primary key value less than 4002 on part-m-00000 and rest from 4002 to rest will be on part-m-00001 hence speed here will be less as     because part-m-0000 will have (2 Fitness,3 Footwear,4 Apparel,5 Golf,6 Outdoors,7 Fan Shop) and part-m-00001 will have (8000,test) hence here concept of boundary       query comes here write --boundary-query "select min(department_id),max(department_id) from departments where department_id<>8000 or department_id!=8000); here it       does even distribution of 3,4 or 4,3 in each.)
+
+#change delimiters
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr \
+--fields-terminated-by '|'         (default is comma i.e ',')
+--lines-terminated-by '#'          (default is new-line character i.e '\n')
+--enclosed-by '"'                  (default is null)
+--boundary-query "select min(department_id),max(department_id) from departments limit 1"
+
+-> (O/P comes in | as delimiter,each row or tupple seperated by # (not by new line as earlier),all values of tokens or cells enclosed by double-inverted-commas i.e.       "" for eg: O/P comes in ("2"|"Fitness"#"3"|"Footwear"#"4"|"Apparel")etc.)
+
+-> (other options are --escaped-by sets escape character as there may be some special character that you have to escape while import if data have that character it    will use that character to be escaped and mitigate impact of special character within data itself --optional-enclosed-by for setting enclosed character and --      mysql-delimeters uses mysql delimiters as ',' for fields,'\n' for new-line,'/' for escaped-by,':' for optional enclose)
+
+#append into file (here no need to have a fresh new directory or delete any old directory and recreate it it simply appends data into existing..!!)
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr \
+--append
+--where "department_id>7" (directly comes in boundry query conditon)
+
+-> (Note: Here append can also be used with different delimiters for eg 2.hello append may have --fields-terminated-by ':' o/p 2.hello,3:hi,4:hy etc)
+
+OR 
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr \
+-m 2
+--append \                       (below 3 queries works same as building where clause condition...!!!)
+--incremental append \           (specifies that file is to be append or lastmodified but for last modified you have to use date column and last value as latest date                                    of previous import lets say for eg : if you did last import on date 23 aug 2017 and time is 23:00:01 and then you made changes so now                                   you have to do this append by last modification and date will be 23 aug 2017 23:00:01)
+--check-column "department_id" \ (specifies column to be examined when determine which rows to import)
+--last-value 3                   (specifies max value in condition for check-column from previous import works as --where "department_id>3")
+
+OR
+
+-> (by sqoop eval in --query "insert into...!!!")
+
+#using split by 
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+--table departments \
+--target-dir /usr \
+--split-by department_id \
+-m 2
+
+-> (split by is used when there is no primary key in table so manually have to be given split by coloumn name...!!!)
+
+#coloumn add
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+-m 2
+--table departments \
+--coloumn department_name \
+--where "department_id>3"
+--target-dir /usr 
+
+-> (here values of dep. name are added and also taken boundary condition of dep. id > 3...!!!!)
+
+-> (Note : --table and --query are mutually exclusive means cant be used within same sqoop query although--table and --boundary-query can be used simultaneously within    same sqoop query...!!!!)
+
+-> (can also --append --coloumns department_id,department_name --where "department_id>3" 0/P is shown as ApparelGolf Outdoors Fan Shop and this below in next part    4,Apparel 5,Golf 6,Outdoors 7,Fan Shop etc...!!!)
+ 
+#neccessary where AND \$CONDITIONS
+
+sqoop import \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+-m 2 \
+--query "select order_items from orders o join order_item_order_id oi on o.orderid=oi.order_item_order_id where \$CONDITIONS"
+--target-dir /usm
+
+-> (NOTE : \$CONDITIONS is neccessary so as to give unique conditions expression to each threads or import processes that runs in parallel if not used then then sqoop     had to give its own true where condition say 1=1 or etc to each process and hence it will also have to append all results & this append is by '$' sign that is to be    escaped by '\' sign so '\$CONDITIONS' is mandatory for eg: this decides that  ifd -m 3 and records are 6 then each part will be given unique condtions that are for     part0 it is (0 to 1),for part2 it is (2 to 3),for part3 it is (4 to 5) hence all six done with different and hence all done...!!!)
+
+# sqoop export
+
+sqoop export \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+-m 2 \
+--table departments_export \              (created in mysql this table exported from sqoop)
+--input-fields-terminated-by ':' \
+--input-lines-terminated-by '|' \
+--export-dir /user/hive/warehouse/xademo.db/departments \
+--batch                                   (it s used to export multiple rows at a time if not used speed will be slow as it exports each single row at a time then)
+
+-> (sqoop treats each and every thing in hdfs in export as a file wheather its hive warehouse or hdfs path so very less commands are there for export vs import)
+   (here also there is no concept of boundry-query hence no need of where and query clause too bcoz sqoop cant talk to hadoop while export not also by queries only        what it understands is file lets say it is of 300 mb and bock size of 128 mb so file will be seen as blocks that is 3 files of 128,128,44mb each respectively           and then lets say we have 3 mappers so each will process one block hence it simply works like block distribution among threads specified and hence export not uses      concept of inner and outer bounds and so on export no query,where,incremental-export, it treats all hive and hdfs equal as path)
+
+# update in export
+
+-> (first-of-all we have to create a table in mysql say departments_export and then create a directory in hdfs called /msd by hdfs dfs -mkdir /msd insert a file say       k.csv and then write into in by hdfs dfs -appendTOFile - /msd/k.csv {7,imo and 9,ok} after that use following command)
+
+-> ( Note : if no primary-key on department_id then values will be appended not updated and duplicate values occured and hence a concept called --staging-table is       used here first all export occurs on that staging table and once whole data is copied then only data moves t target directory as a single transaction hence either      the transaction as a whole is done or rejected if any issues occurs so using it is benificial in case of table if no primary key and it will delete the data before    exporting it to target by --clear-staging-table also no concept of staging-table with update-key) 
+    
+sqoop export \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+-m 1 \
+--table departments_export \              (created in mysql this table exported from sqoop)
+--export-dir /msd \
+--batch \  
+--update-key department_id \              (key of mysql table)
+--update-mode allowinsert                 (default is updateonly it only updates the value not insert i.e. from above example only 7,imo will be done instead of                                                  7,fanshop and by allowinsert mode it will update as well as insert new values also like 9,ok)
+
+# sqoop export delimiters
+
+--input-fields-terminated-by '|'         
+--input-lines-terminated-by '#'
+--input-enclosed-by '"'
+--input-escaped-by
+--input-optionally-escaped-by
+--input-null-string
+--input-null-non-string
+
+-> (all works just same as in import only syntax difference of 'input' is there)
+
+sqoop export \
+--connect "jdbc:mysql://localhost:3306/retail_db" \
+--username retail_dba \
+--password hadoop \
+-m 2 \
+--table departments_export \
+--batch \
+--input-fields-terminated-by '\001' \   (ascii value for ^A i.e. null character)
+--input-lines-terminated-by '\n' \      (use or not it is same for both hive and sqoop by default it is new-line)
+--input-null-string haha \
+--input-null-non-string -1 \
+--outdir java_collector
+
+-> (it exports the values where string-values are haha and non-string-values are '-1' to null in mysql table just as opposite to import null-string and null-non-      string)

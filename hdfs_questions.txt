@@ -1,0 +1,107 @@
+# FIRST OF ALL START ALL SERVICES BY
+
+->start_all.sh
+
+# NOW WORKING ON HDFS COMMANDS
+
+# COPY A FILE FROM LOCAL TO HDFS
+
+->hadoop fs -copyFromLocal '/home/user_name/Desktop/file.txt' /
+OR 
+->hadoop fs -put /home/user_name/Desktop/file.txt /
+
+#MOVES LOCAL FILE FROM DESKTOP TO HDFS ROOT DIRECTORY (LIKEWISE CAN GIVE PATH ABSOLUTE OR RELATIVE TO COPY)
+ 
+# COPY A FILE FROM HDFS TO LOCAL
+
+->hadoop fs -copyToLocal '/home/user_name/Desktop/file.txt' /
+OR 
+->hadoop fs -get /file.txt /home/user_name/Desktop 
+
+#COPIES LOCAL FILE FROM DESKTOP TO HDFS ROOT DIRECTORY (LIKEWISE CAN GIVE PATH ABSOLUTE OR RELATIVE TO COPY)
+ 
+#LIST FILES
+
+->hadoop fs -ls /(path)
+->hadoop fs -ls -R /(LIST WHOLE path recursively)
+
+#MAKE DIRECTORY IN HDFS
+
+->hadoop fs -mkdir /down
+->hadoop fs -mkdir -P /down/from/near 
+
+#IT MAKES DIRECTORY RECURSIVELY NO NEED TO DO AGAIN AND AGAIN
+
+#COPY FILES IN HDFS FROM ONE LOCATION TO ANOTHER
+
+->hadoop fs -cp /down /list/details
+
+# MOVE A FILE FROM LOCAL TO HDFS
+
+->hadoop fs -mvFromLocal /home/user_name/Desktop/file1.txt /
+
+#MOVES LOCAL FILE FROM DESKTOP TO HDFS ROOT DIRECTORY (LIKEWISE CAN GIVE PATH ABSOLUTE OR RELATIVE TO COPY)
+ 
+# MOVE A FILE FROM HDFS TO LOCAL
+
+->hadoop fs -mvToLocal /file1.txt /home/user_name/Desktop
+
+#MOVES LOCAL FILE FROM DESKTOP TO HDFS ROOT DIRECTORY (LIKEWISE CAN GIVE PATH ABSOLUTE OR RELATIVE TO MOVE)
+
+# TO CREATE A FILE IN HDFS
+
+->hadoop fs -touch /down/k.txt  
+ 
+# CONCATINATE A FILE IN STD_OUT OR TERMINAL OF HDFS
+
+->hadoop fs -cat /down/k.txt
+
+#TO REMOVE A FILE OR DIRECTORY IN HDFS
+
+->hadoop fs -rm /down/k.txt
+->hadoop fs -rm -R /down/from/near (#REMOVES RECURSIVELY)
+
+# TO CALCULATE LENGTH OF FILE 
+
+->hadoop fs -mkdir /hello/world
+->hadoop fs -du -h /hello/world
+->hadoop fs -du -h -s / (SHOWS SUMMARY SIZE OF ALL)
+
+# APPENDING A FILE TO HDFS THAT ALREADY EXISTS
+
+->touch file2.txt [ADD ANY TEXT DO IN LOCAL FS]
+->hadoop fs -touch /file3.txt [ADD ANY TEXT ITS IN HDFS]
+->hadoop fs -appendToFile  /home/user_name/Desktop/file2.txt /file3.txt [FIRST IS LOCAL PATH AND LATTER IS HDFS PATH]
+->hadoop fs -cat /file3.txt [YOU SEE CONTENTS OF file2.txt ARE ADDED TO file3.txt IN HDFS]
+
+#DIRECTLY ADD A CONTENTS IN HDFS FROM STD_IN
+
+->hadoop fs -appendToFile - /file4.txt [BLINKING.... ENTER ANY TEXT IT WILL DIRECTLY BE ADDED TO file4.txt WITHOUT EVEN PRE-CREATION OF THAT FILE]
+
+# REMOVE FILES FROM TRASH
+
+->hadoop fs -expunge
+
+# CHANGE OWNER OF THE DIRECTORY OR FILE
+
+->hadoop fs -chown hdfs:hdfs /file*.txt (DEFAULT WILL BE USER_NAME:supergroup)
+->hadoop fs -chown user_name:supergroup /file*.txt (CHANGE AGAIN TO DEFAULT SO AS TO ACCESS ALL FILES WITH ALL PERMISSIONS)
+->hadoop fs -chown -R hdfs:hdfs /file*.txt (RECURSIVELY CHANGES OF ALL N THAT PATH OR MORE IN DEEPER)
+
+#CHANGE MODE OR PERMISSIONS OF FILE OR DIRECTORY
+
+->hadoop fs -chmod 777 /file*.txt (GIVES PERMISSION TO ALL USERS GROUPS AND OTHERS TO HAVE ACCESS)
+->hadoop fs -chmod -R 600 /file*.txt (GIVES PERMISSION OF READ AND WRITE TO USER AND NO PPERMISSION TO OTHERS OR GROUP AS LATTER TWO ARE ZEROES ACCESS)
+
+#TO REMOVE EMPTY DIRECTORY IN HDFS
+
+->hadoop fs -mkdir /Down
+->hadoop fs -rmdir /Down
+
+#TO SEE THE LAST 1 KB OF FILE CONTENTS
+
+->hadoop fs -tail /file1.txt
+
+
+
+

@@ -1,0 +1,267 @@
+NOTE :-> OFFICIAL HIVE DOCUMENTATION ALWAYS TAKE HELP FROM IT ; 
+
+GET  LIST OF FUNCTIONS
+
+-> show functions;
+
+GET SYNTAX OF FUNCTIONS
+
+-> describe function (any function);
+
+STRING FUNCTIONS
+
+-> select length("hello hi"); -> 10
+-> select instr('order_item_subtotal sub','sub'); -> 12 (first occurence of string specified)
+-> select substr('order_item_subtotal',-4,3); -> ota (position and then length till specified number)
+-> select 'order_item_subtotal sub' like '%sub%'; -> true
+-> select 'order_item_subtotal sub' like 'sub'; -> false
+-> select 'order item sub sub' rlike 'su*'; -> true (for regular expressions) 
+-> select ucase/upper('order item sub sub');
+-> select lcase/lower('order item sub sub');
+-> select initcap('order item sub sub');  -> Order Item Sub Sub
+-> select trim('       order item sub sub    '); -> order item sub sub
+-> select rtrim('       order item sub sub    '); ->       order item sub sub
+-> select ltrim('       order item sub sub    '); -> order item sub sub
+-> select rpad('12',3,'0'); (adds 0 to right of 12, 3 places from 1 in 12 it is 120) 
+-> select lpad('12',3,'0'); (adds 0 to right of 12, 3 places before 12 it is 012)
+-> select cast('ok' as int); -> null
+-> select split('12 33 55',' '); -> ["12","33","55"]
+-> select index(split('12 33 55',' '),0); -> 12
+
+DATE FUNCTIONS
+
+NOTE :-> Advantage of using unix time is that it converts easily to number format and calculations in numbers is much faster than in strings and it matters a lot in dealing with big data
+
+-> select current_date;
+-> select current_timestamp;
+-> select date_format(current_date , 'y'/'m'/'d'/'D'); -> 2017(year) 07(month) 18(day) 280(days from 1 to 365);
+-> select day(current_date);
+-> select dayofmonth(current_date);
+-> select to_date(current_timestamp) -> (converts to date format although not so relevant in hive as hive uses internally string only);
+-> select to_unix_timestamp(current_timestamp) -> (counts every second from 1 jan 1970 till current date and time);
+-> select to_unix_timestamp(current_timestamp) -> (counts every second from 1 jan 1970 till current date);
+-> select from_unixtime(150374560) -> (viceversa of above)
+-> select to_date(order_date) from orders; 
+-> select date_add(order_date,10) from orders; -> (adds 10 date in each)
+-> from_utc_timestamp (for utc format)
+
+AGGREGATE FUNCTIONS
+
+NOTE :-> these functions take multiple records and then gives output to single record but in rest cases single record and single output is there.
+
+-> select count(1),order_status from xademo.orders;
+ 
+It is not valid ERROR occurs because count selects group as a whole for complete dataset but order_status is different so needs to be grouped.
+
+-> select count(1),count(distinct order_status) from xademo.orders;
+
+As two counts are there but as in whole dataset is there so it matches heence this is correct query.
+
+AGGREGATIONS
+
+-> select count(1),order_status from xademo.orders group by order_status;
+
+GROUPING
+
+revenue pper day
+-> select count(1) from (select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_date ) q; -> 364
+
+revenue per day and status
+-> select count(1) from (select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_date,order_status ) q; -> 3165
+
+revenue per day per id
+->select count(1) from (select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_date,order_id ) q; -> 57431
+
+revenue per status
+-> select count(1) from (select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_status) q; -> 9
+
+NOTE :-> 
+
+>>Hence it groups in different ways also grouping cant be done on derived columns like order_revnue. 
+
+>>where clause can't be used on derived columns so have to use having clause.
+
+>> where clause can't be used after group by clause so use it before it. 
+
+get order_revenue greater than 1000
+-> select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id group by order_status,order_date,order_id having sum(order_item_subtotal) >=1000; -> if count by above subquery logic output will be 7519
+
+for only COMPLETE and CLOSED orders
+-> select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_status,order_date,order_id having order_revenue >=1000; -> if count by above subquery logic output will be 3297
+
+OR IF NOT WORKS IN HIVE THEN DO 
+
+-> select order_id,order_date,order_status,sum(order_item_subtotal) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_status,order_date,order_id having sum(order_item_subtotal) >=1000;
+
+CASE FUNCTION
+
+NOTE :-> Same as if else or any conditions in programming language.
+
+-> describe function case;
+-> select order_status,case when order_status in ('COMPLETE','CLOSED') then 'NO ACTION ' when order_status in ('ON_HOLD','PENDING','PAYMENT_REVIEW','PROCESSING','PENDING_PAYMENT') then 'ACTION PENDING' else 'RISKY ' end from orders limit 10;
+ 
+OR
+
+-> select order_status,case order_status when 'COMPLETE' then 'NO ACTION' when 'CLOSED' then 'NO ACTION' when 'ON_HOLD' then 'ACTION PENDING' when 'PENDING' then 'ACTION PENDING' when 'PAYMENT_REVIEW' then 'ACTION PENDING' when 'PROCESSING' then 'ACTION PENDING' when 'PENDING_PAYMENT' then 'ACTION PENDING' else 'RISKY' end from orders;
+
+NOTE :-> select order_status,case order_status when 'COMPLETE' or 'CLOSED' then 'NO ACTION'  when in ('ON_HOLD','PENDING','PAYMENT_REVIEW','PROCESSING','PENDING_PAYMENT') then ' ACTION PENDING' else 'RISKY' end from orders , It fails so have to give individual each and every order_status .
+
+FOR NULLS
+
+NOTE :-> It is special CASE FUNCTION for nulls to represent nulls as desired also nvl came from oracle and is not in any other db;
+
+-> select nvl(order_status,'NO STATUS') from orders;
+
+OR
+
+-> select case when order_status is null then 'NO STATUS' else order_status end from orders;
+
+NOTE :-> select case when order_status is null then 'NO STATUS' else order_status from orders;
+
+ROW LEVEL TRANSFORMATION
+
+NOTE :-> 
+
+>>RTL is process to implement functions and apply them. DATA STANDARIZATION,DATA CLEANSING,DATA OFFUSCATION are three important things to be done by creating good queries.So DATA CLEANSING is simple cleaning of data so as to remove special characters or any other bugs that may come by any means, DATA STANDARIZATION is way of making data to be in a particular manner for all systems irrespective of its different source locations over web or multiple computers eg social security number, we do it for phone numbers or addresses as well,DATA OFFUSCATION is getting only that data that is relevant for eg in order_date if only want date then get it no need of timestamp etc.
+
+>>BIG DATA is downstream application or database (search over web)
+
+-> select cast(concat(substr(order_date,1,4),substr(order_date,6,2)) as int)from orders;
+
+OR
+
+-> select cast(date_format(order_date,'YYYYMM') as int) from orders;
+
+JOINS (SIMILAR TO MYSQL JOINS)(CHECK HIVE SECTION)
+
+-> FULL OUTER,LEFT OUTER,RIGHT OUTER,INNER,OUTER JOINS ALL SEE EXAMPLE ONLY SELF SENSE. outer joins are for one to many and full outer are for many to many relationships.
+
+-> select o.*,c.* from orders o,customers c where o.order_customer_id=c.customer_id; -> (can perform join by this 'where' clause also instead of 'on' clause)
+
+NOW;
+
+-> select * from customers c left outer join orders o on o.order_customer_id=c.customer_id where o.order_customer_id is null;
+
+OR
+
+-> select * from customers where customer_id not in (select distinct order_customer_id from orders);
+
+NOTE :-> 'IN' CLAUSE is slow in hive as per current status above query takes 7 jobs but normally without in it takes only 1 job and is more efficient;
+
+SORTING
+
+NOTE :-> 
+
+>> only order by clause in hive supports derived cols aliases rest all want actual only.
+
+>> in hive no positional notations like in oracle 
+
+-> select order_id,order_date,order_status,round(sum(order_item_subtotal),2) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_date having sum(order_item_subtotal) >=1000 order by order_date asc,order_revenue desc; -> sorts ascendingly by order_date first and then revenue in descending.
+
+NOTE :->
+
+>> order by sorts all globally but if want sort within each date by revenue descendingly so here not specified to sort date in asc so here hence no need to sort globally do 'sort by' clause along with 'distribute by' clause .
+
+>> advantage of sort by is that it is faster when it comes to big volumes of data hence also order by can't scale up as it does global sorting but sort by can do scaling up and will get optimal solution.
+>> disadvantage of sort by is that it don't do global sorting hence here date will be randomly sorted.
+ 
+-> select order_id,order_date,order_status,round(sum(order_item_subtotal),2) order_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by o.order_id,o.order_date,o.order_status having sum(order_item_subtotal) >=1000 distribute by o.order_date sort by o.order_date,order_revenue desc;
+
+SET OPERATIONS
+
+NOTE :-> 
+
+>> hive only supports union and union all not intersection or difference.
+
+>> joins are b/w 2 tables on same key but ubions are b/w 2 datasets similar in nature
+
+-> select 'hello',1 union select 'hi',1 union select 'hello',1 union select 'hi',2; -> removes duplicate
+
+-> select 'hello',1 union all select 'hi',1 union all select 'hello',1 union all select 'hi',2; -> gives all as it is
+
+ANALYTICAL FUNCTIONS (VERY IMPORTANT)
+
+NOTE :-> over clause with partition by and one of aggregate functions (count,avg,min,max,sum etc) is analytical functions.
+
+calculate order_subtotal percentage of each id within each group of order_id;
+
+for eg :
+
+1 1 957   1 299.99 299.99
+2 2 1073 1 199.99 199.99
+3 2 502   5 250.0   50.0 
+4 2 403   1 129.99 129.99
+
+here for each id group by id say take 2 so here subtotal by group is  299.99+199.99+250.0 = 579.98 now we have to calculate 299.99/579.98  199.99/579.98  250.0/579.98 like wise for each and every record grouped by id.
+
+-> select order_id,order_date,order_status,order_item_subtotal,round(sum(order_item_subtotal),2) order_revenue,order_item_subtotal/round(sum(order_item_subtotal),2) percent_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_date having sum(order_item_subtotal) >=1000 order by order_date asc,order_revenue desc;
+
+-> it will not be accurate as hive will complain to group by order_item_subtotal as well and also in mysql it returns only percent of first value of group not of each record eg here it gives only 299.99/579.98 not rest.
+ 
+SO DO THIS INSTEAD
+
+-> select order_id,order_date,order_status,order_item_subtotal,round(sum(order_item_subtotal) over (patition by o.order_id),2) order_revenue,order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_date having sum(order_item_subtotal) >=1000 order by order_date asc,order_revenue desc;
+-> check this query works or not
+
+NOTE :-> over (partition by) works as group by key on particular sub groups and then returns aggregated output.
+
+OR
+
+-> select * from (select order_id,order_date,order_status,order_item_subtotal,round(sum(order_item_subtotal) over (partition by o.order_id),2) order_revenue,order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue,round(avg(order_item_subtotal) over (partition by o.order_id),2) from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') ) q where order_revenue>=1000 order by order_date asc,order_revenue desc;
+ 
+NOTE :-> where can't be used in derived columns but if treat under subquery then where can work on derived columns (see it as above).
+
+RANKING 
+
+NOTE :-> rank is used to give ranks to the group's subgroups here used functions are rank(),dense_rank(),percent_rank(),row_number() etc. 
+
+-> select * from 
+( select order_id,order_date,order_status,order_item_subtotal,
+round(sum(order_item_subtotal) over (partition by o.order_id),2) order_revenue,
+order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue,
+round(avg(order_item_subtotal) over (partition by o.order_id),2) average_revenue,
+rank() over (partition by order_id order by order_item_subtotal desc) rank_revenue,
+dense_rank() over (partition by order_id order by order_item_subtotal desc) dense_rank_revenue,
+percent_rank() over (partition by order_id order by order_item_subtotal desc) percent_rank_revenue,
+row_number() over (partition by order_id order by order_item_subtotal desc) row_number_with_order_by_revenue,
+row_number() over (partition by order_id) row_number_without_order_by_revenue 
+from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') 
+) q 
+where order_revenue>=1000 
+order by order_date asc,order_revenue desc,rank_revenue;
+
+FOR EG. :-> 
+
+for any group in group by order_id say a order_id 52334 has 
+
+                             399  199    199  159    59
+rank ->                 1       2       2      4        5         
+dense_rank ->      1       2       2      3        4
+percent_rank ->   0.0    0.25  0.25  0.75  1.0
+row_number:
+with_order ->       1       3       2       4       5         -> ranks it as ordered but give random row numbers on equal records like here on 2 and 3  it may also be 1       2       3       4       5
+without_order ->  2       3       1       4      5          -> here all random
+
+WINDOWING FUNCTIONS (rarely used) 
+
+NOTE :-> windowing is used for time series analysis here used functions are lead(),lag(),first_value(),last_value() etc. fisrt_value gives the first value in group's subgroup vice versa for last_value,lead gives next value of record over particular group and lag for previous so for proper analysis of series have to do order by else random values will be generated.
+
+-> select * from 
+( select order_id,order_date,order_status,order_item_subtotal,
+round(sum(order_item_subtotal) over (partition by o.order_id),2) order_revenue,
+order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue,
+round(avg(order_item_subtotal) over (partition by o.order_id),2) average_revenue,
+rank() over (partition by order_id order by order_item_subtotal desc) rank_revenue,
+dense_rank() over (partition by order_id order by order_item_subtotal desc) dense_rank_revenue,
+percent_rank() over (partition by order_id order by order_item_subtotal desc) percent_rank_revenue,
+row_number() over (partition by order_id order by order_item_subtotal desc) row_number_with_order_by_revenue,
+row_number() over (partition by order_id) row_number_without_order_by_revenue, 
+lead(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc),
+lag(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc),
+first_value(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc),
+last_value(order_item_subtotal)over (partition by order_id order by order_item_subtotal desc)
+from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') 
+) q 
+where order_revenue >= 1000 
+order by order_date asc,order_revenue desc,rank_revenue;
+
