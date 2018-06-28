@@ -1,0 +1,182 @@
+DO
+
+ssh-agent bash 
+ 
+AND THEN
+
+ssh -i Cluster_setup.pem root@ec2-54-210-208-194.compute-1.amazonaws.com
+
+OR 
+
+ssh-add Cluster_setup.pem
+ssh-add -L
+ssh -A root@ec2-54-210-208-194.compute-1.amazonaws.com
+
+AFTER LAUNCHING INSTANCE
+
+yum -y install telnet;
+yum -y install wget;
+yum -y install httpd;
+service httpd start;
+chkconfig httpd on;
+telnet 10.0.0.127 80 (to check if running or not)
+vi /etc/httpd/conf/httpd.conf
+(in vi)->
+
+:/ServerName -> uncomment it and do this ServerName 10.0.0.127:80
+:/NameVirtualHost -> uncomment it (press n for next) and do this NameVirtualHost 10.0.0.127:80 
+press shift+G to go to end of file and do ->
+<VirtualHost *:80>  -> uncomment all 6 lines below
+/%s/dummy-host.example.com/10.0.0.127
+set document root to /var/www/10.0.0.127
+
+NOW 
+
+mkdir -p /var/www/10.0.0.127
+vi /var/www/10.0.0.127/index.html ->(write in it hello dear all stuff) 
+
+NOW 
+
+enable foxy-proxy [Use proxy emr-socks-proxy for all URLs] 
+
+THEN DO 
+
+ssh -i Cluster_set.pem -ND 8157 root@ec2-54-210-208-194.compute-1.amazonaws.com ->(it hangs) (then check both with private as well as public ip)
+
+FOR PARALLEL SSH =>
+
+wget https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/parallel-ssh/pssh-2.3.1.tar.gz
+vi ~/.bash_profile
+
+(in vi) -> 
+PATH=$PATH:/root/pssh-2.3.1/bin
+export PATH
+
+. ~/.bash_profile
+
+INSTALLING CLOUDERA
+
+FOR CLOUDERA-CDH5 REPO => (binaries for cloudera distribution of hadoop)
+
+wget https://archive.cloudera.com/cdh5/redhat/6/x86_64/cdh/cloudera-cdh5.repo
+
+FOR CLOUDERA-MANAGER REPO => (binaries for cloudera monitoring agents)
+
+wget https://archive.cloudera.com/cm5/redhat/6/x86_64/cm/cloudera-manager.repo
+
+THEN DO (check public repositories from where all packages are installed)
+
+cd /etc/yum.repos.d 
+yum -y install yum-utils createrepo
+cd  /var/www/10.0.0.127 (DOCUMENT ROOT)
+nohup reposync cloudera-manager & (& for backend)
+nohup reposync cloudera-cdh5 &
+cat /etc/yum.repos.d/cloudera*
+mkdir -p /var/www/10.0.0.127/cdh5/redhat/6/x86_64/cdh/5/
+mv /var/www/10.0.0.127/cloudera-cdh5/* /var/www/10.0.0.127/cdh5/redhat/6/x86_64/cdh/5/
+mkdir -p /var/www/10.0.0.127/cm5/redhat/6/x86_64/cm/5/
+mv /var/www/10.0.0.127/cloudera-manager/* /var/www/10.0.0.127/cm5/redhat/6/x86_64/cm/5/ 
+rm -rf /var/www/10.0.0.127/cloudera-manager base extras updates
+createrepo /var/www/10.0.0.127/cdh5/redhat/6/x86_64/cdh/5/
+createrepo /var/www/10.0.0.127/cm5/redhat/6/x86_64/cm/5/
+yum repolist
+vi /etc/yum.repos.d/cloudera*.repo ( :%s/archive.cloudera.com/10.0.0.127 , :%s/https/http , :n , again repeat previous commands for this next file. )
+
+RUN SCRIPT -> centOS_script.sh -> chmod u+x centOS_script.sh
+CREATE FILE -> hosts.txt
+EXECUTE IT IN ANY NODE IT WILL RUN SCRIPT ON EVERY NODE -> pssh_thing.sh -> chmod u+x pssh_thing.sh
+
+FOR GROUP KEY OF CLOUDERA =>
+
+cd /var/www/10.0.0.127/cm5/redhat/6/x86_64/cm
+wget https://archive.cloudera.com/cm5/redhat/6/x86_64/cm/RPM-GPG-KEY-cloudera
+
+FOR CLOUDERA INSTALL BIN FILE =>
+
+wget https://archive.cloudera.com/cm5/installer/latest/cloudera-manager-installer.bin
+chmod +x cloudera-manager-installer.bin
+./cloudera-manager-installer.bin --skip_repo_package=1
+
+NOW IF IT FAILS THEN DO (important) =>
+
+groupadd hadoop
+useradd -g hadoop hduser
+su - hduser                              (here - is there because if do only -> su hduser and then ls (permission denied) but if do -> su - hduser then ls (properly works))
+ssh-kegyen -t rsa 
+cd .ssh 
+cat id_rsa.pub > authorized_keys
+cat id_rsa (copy and save it to desktop id_rsa.txt)
+exit
+vi /etc/sudoers
+
+(in vi) =>
+
+UNDER THE LINE => (root ALL =(ALL)  ALL) APPEND THIS =>
+hduser ALL =(ALL) NOPASSWD: ALL
+
+NOTE :-> 
+
+-> IN 4th NUMBER IN INSTALLATION WIZARD OF CLOUDERA CHOOSE ANOTHER USER AND THEN WRITE hduser GIVE PASSWORD OR KEY id_rsa.txt NOW IT WILL BE DONE DO NEXT NEXT AND BOOM.
+
+-> ONCE DONE CONFIGURE ZOOKEEPER,YARN,HDFS AND WHATEVER COMPONENTS YOU REQUIRE.
+
+-> NOW YOU REQUIRE RDBMS LIKE MYSQL ALSO FOR SOME COMPONENTS TO WORK LIKE HIVE,OOZIE,IMPALA  HERE IN HIVE A METASTORE IS THERE THAT METASTORE  IS RDBMS AND HENCE STORES METADATA OF TABLES  IN THE (HERE) MYSQL DATABASE SO DO :->
+
+yum -y install mysql-server (do in any of master nodes)
+service mysqld start
+chkconfig --list mysqld
+chkconfig mysqld on
+chkconfig --list mysqld 
+yum -y install mysql-connector-java   (SO AS TO CONNECT IT TO THE DIFFERENT NODES SAY IF hive server (for thrift services i.e. to connect to external sources via JDBC or ODBC )and hive metastore server (for interaction with database) ARE ON OTHER NODE BUT WE HAVE TO CONNECT IT TO MYSQL THAT IS ON ANOTHER NODE SAY CLIENT OR GATEWAY NODE SO WE NEED A CONNECTOR)
+
+IF FAILS THEN DO =>
+
+gzip /etc/yum.repos.d/cloudera-*.repo (so that mysql does not get installed from cloudera repositories that we configured) 
+gunzip /etc/yum.repos.d/cloudera-*.repo (after installed make it sure to unzip the repositories)
+
+NOW
+
+/usr/bin/mysql_secure_installation -> (now set passsword and in remote login section type n and leave rest as default)
+
+mysql> create database hive;
+          > create user hive indentified by 'hive';
+          > grant all on hive.* to hive;
+          > flush privileges;
+
+NOTE :-> IN 3rd NUMBER IN INSTALLATION WIZARD OF HIVE CHOOSE CUSTOM DATABASES TO MYSQL AND GIVE HOSTNAME WHEREEVER THE MYSQL IS INSTALLED here 10.0.0.127:3306 (port no.) THEN TEST CONNECTION.
+
+FOR SPARK 1.6 (DIRECT INSTALLATION)
+
+sudo yum install spark-core spark-master spark-worker spark-history-server spark-python
+sudo service spark-master start
+
+AND THEN CONFIGURE SPARK AND START IT ON YOUR CLOUDERA MANAGER
+
+FOR SPARK 2 (CUSTOM PARCEL)
+
+GO TO LINK => https://www.cloudera.com/documentation/spark2/latest/topics/spark2_packaging.html#packaging
+
+scp -i Cluster_setup.pem SPARK2_ON_YARN-2.2.0.cloudera2 root@ec2-54-210-208-194.compute-1.amazonaws.com:~
+chmod -R 644 /opt/cloudera/csd
+chown -R cloudera-scm:cloudera-scm /opt/cloudera/csd
+mv SPARK2_ON_YARN-2.2.0.cloudera2 /opt/cloudera/csd
+service cloudera-scm-server restart
+
+NOTE :=>
+
+TO ACCESS HIVE TABLES DO:
+
+cp /etc/hive/conf/hive-site.xml /usr/lib/spark/conf/
+
+IF YARN BAD HEALTH OR JOB HISTORY SERVER NOT RUNNING GO TO LOGS IN UI IT WILL BE PERMISSION ERROR SO DO:
+
+su - hdfs
+hdfs dfs -chmod -R 777 /  => (as earlier it was not giving write permissions to jobs)
+hdfs dfs -chown -R root:root /  => (to access always as root not to change user again and again)
+exit
+
+TO UNINSTALL CLOUDERA-MANAGER DO =>
+
+sudo /usr/share/cmf/uninstall-cloudera-manager.sh
+
+
