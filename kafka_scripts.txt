@@ -9,10 +9,13 @@ FIND PATH OF KAFKA AND THEN DO IN
 
 vi ~/.bash_profile
 
-export KAFKA_HOME = /path_to_bin_file_f_kafka/bin 
-PATH:$PATH:$KAFKA_HOME/bin
+export KAFKA_HOME=/etc/kafka
+PATH=$PATH:$KAFKA_HOME/bin
+export PATH
 
 . ~/.bash_profile
+
+validate by kafka and then tab key (you will see bunch of .sh scripts)
 
 NOW CREATING A TOPIC
 
