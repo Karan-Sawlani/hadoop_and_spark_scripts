@@ -182,7 +182,7 @@ EG: INSERT INTO TABLE dept SELECT * FROM departments;
 
 OR
 
-EG: INSERT OVERWRITE INTO TABLE dept SELECT * FROM departments;
+EG: INSERT OVERWRITE TABLE dept SELECT * FROM departments;
 
 -> TO COPY DATA FROM MYSQL DB TO LOCAL FILE SYSTEM (HINT : IT CAN BE USED INSTEAD IF SQOOP NOT WORKING ON LOCAL LINUX VIRTUAL BOX OF MINE...LOL)
 
@@ -446,3 +446,5 @@ FOR EG :
 -> insert into table order_partition-dynamic_strict partition (order_year,order_month) select *,substr(order_date,1,4) year,substr(order_date,6,2) month from orders;
 
 (HERE ALL DONE AUTOMATICALLY NO NEED TO ADD PARTITIONS)
+
+
