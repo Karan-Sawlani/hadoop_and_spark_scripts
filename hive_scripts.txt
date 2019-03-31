@@ -86,6 +86,8 @@ INSTEAD OF
 
 -> hive> set hive.exec.dynamic.partition=true,set hive.exec.dynamic.partition.mode=nonstrict; [To make dynamic partition i.e. multiple partitions created automatically via map-reduce jobs,AND THE STRICT MODE IS SIMILAR TO STATIC IF ONLY SINGLE PARTITION]
 
+-> hive> set hive.enforce.bucketing=true; [To do bucketing else it will create only one bucket]
+
 -> create table orders_part(order_id int,order_date timestamp,order_customer_id int,order_status string) PARTITIONED BY (order_month string) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ;
 -> insert into table orders_part partition (order_month) select order_id, from_unixtime(cast(substr(order_date,1,10) AS bigint)) order_date,order_customer_id,order_status,substr(from_unixtime(cast(substr(order_date,1,10) AS bigint)),1,7) order_month from orders;
 
