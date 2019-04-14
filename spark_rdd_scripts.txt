@@ -319,6 +319,27 @@ so hence now it will go in next lambda function  here are two intermediate value
 
 Syntax :-> aggregateByKey(initial value is output value type,lambda [x,y (here x is output value (value is of key,value one )here it is tuple and y is input value here it is float)],lambda [x,y (both x and y are                  of tuple i.e. output value.) ])
 
+<---------------------------TRY THIS---------------------------->
+
+'''
+
+from pyspark import SparkContext
+sc = SparkContext.getOrCreate()
+oi = sc.textFile("/user/hive/warehouse/r.db/order_itemsmm/p*")
+gm = oi.map(lambda a : (int(a.split('\x01')[1]),a))
+gma1 = gm.aggregateByKey((0.0,0.0,0),
+                         lambda a,b : (a[0]+float(b.split('\x01')[4]),a[1]+float(b.split('\x01')[4]),a[2]+1),
+                         lambda a,b : (a[0]+b[0],a[1]+b[1],a[2]+1)
+                        )
+
+gma1s = gma1.sortByKey()
+
+for i in gma1s.take(10):
+    print(i)
+
+'''
+
+
 -> groupByKey(it is not used more as it not uses combiner logic so its perfomance is degraded used only if reduceByKey or agrregateByKey not works.)
 
 -> sortByKey (both input and output are paired RDD)
