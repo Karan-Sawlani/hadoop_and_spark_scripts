@@ -506,6 +506,71 @@ for i in pfmgt.take(18): print(i.split(',')[1],i.split(',')[4],i.split(',')[2])
 (u'36', u'19.99', u"Glove It Women's Trellis Golf Glove")
 (u'36', u'17.99', u"Hirzl Men's Soffft Flex Golf Glove")
  
+ <---------------------------------- Check Out -------------------------------------->
+ 
+ from pyspark import SparkContext
+sc = SparkContext.getOrCreate()
+oi = sc.textFile("/user/hive/warehouse/r.db/order_itemsmm/p*")
+gm = oi.map(lambda a : (int(a.split('\x01')[1]),a))
+gmr = gm.reduceByKey(lambda a,b : a if float(a.split('\x01')[4])>float(a.split('\x01')[4]) else b)
+gmg = gm.groupByKey()
+#str(gmg.first()[1]).split("\x01")
+
+# finds top n prices in a group
+
+def top_Nprice(groups_list,n):
+    price_list=[]
+    for i in list(groups_list[1]):
+        g = float(i.split('\x01')[4])
+        price_list.append(g)
+    ans = sorted(price_list,reverse=True)[:n]
+    return ans
+
+# finds top distinct prices in a group
+
+def distinct_top_price(groups_list,n):
+    price_list=[]
+    for i in list(groups_list[1]):
+        g = float(i.split('\x01')[4])
+        price_list.append(g)
+    ans = sorted(set(price_list),reverse=True)[:n]
+    return ans
+    
+# itertools usage to work faster 
+
+def countTopN_ByPrice(get_RDD,topN):
+    list_conversion = sorted(get_RDD[1],key = lambda a: float(a.split(',')[4]),reverse=True)
+    RDD_map = map(lambda k : float(k.split(',')[4]),list_conversion)
+    s_topN = sorted(set(RDD_map),reverse=True)[:topN]
+    import itertools as it
+    return it.takewhile(lambda o: float(o.split(',')[4]) in s_topN,list_conversion)
+
+    
+print(list(gmg.first()[1]))
+gmgc = gmg.flatMap(lambda a : (list(a[1]),distinct_top_price(a,3)) )
+#gmgc = gmg.flatMap(lambda a : (list(a[1]),top_Nprice(a,3)) )
+
+for i in gmgc.take(40):
+    print(i)
+    print 
+    
+'''
+gmgm = gmg.map(lambda a:(a[0],sorted(a[1],key=lambda k:float(k.split("\x01")[4]),reverse=True)))
+gmgmm = gmgm.flatMap(lambda a : a[1])
+
+for i in gmgm.take(3):
+    print(i)
+print 
+gmgf = gmg.flatMap(lambda a:(a[0],sorted(a[1],key=lambda k:float(k.split("\x01")[4]),reverse=True)))
+for i in gmgf.take(3):
+    print(i)
+print
+for i in gmr.take(3):
+    print(i)
+'''
+
+------------------------------------------> Check Ends <-------------------------------------------
+ 
 -> SET OPERATIONS (union,subtract,intersection)
 
 ->filter->join
