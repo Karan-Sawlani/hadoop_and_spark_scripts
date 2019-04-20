@@ -248,7 +248,7 @@ without_order ->  2       3       1       4      5          -> here all random
 
 # SECOND HIGHEST ORDER_SUBTOTAL
 
-sqlContext.sql( 'select o.order_id as oid, substr(o.order_date,1,10) as od, o.order_status as os,oi.order_item_subtotal as osum,round(sum(oi.order_item_subtotal) over (partition by o.order_id),2)as s_osum,round(avg(order_item_subtotal) over (partition by o.order_id),2) as a_osum,round(oi.order_item_subtotal*100/sum(oi.order_item_subtotal) over (partition by o.order_id),2) as p_osum,rank() over (partition by order_id order by order_item_subtotal desc) as r,dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr,round(percent_rank() over (partition by order_id order by order_item_subtotal desc),2) as pr,row_number() over (partition by order_id order by order_item_subtotal) as rna,row_number() over (partition by order_id order by order_item_subtotal desc) as rnd from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having dr = 2' ).show(789)
+sqlContext.sql( 'select o.order_id as oid, substr(o.order_date,1,10) as od, o.order_status as os,oi.order_item_subtotal as osum,rank() over (partition by order_id order by order_item_subtotal desc) as r,dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having dr = 2' ).show(789)
 
 WINDOWING FUNCTIONS (rarely used) 
 
@@ -272,4 +272,27 @@ from orders o join order_items oi on o.order_id=oi.order_item_order_id where ord
 ) q 
 where order_revenue >= 1000 
 order by order_date asc,order_revenue desc,rank_revenue;
+
+# ALL SUMMARY
+
+sqlContext.sql( 
+'select o.order_id as oid, 
+substr(o.order_date,1,10) as od, 
+o.order_status as os,
+oi.order_item_subtotal as osum,
+round(sum(oi.order_item_subtotal) over (partition by o.order_id),2)as s_osum,
+round(avg(order_item_subtotal) over (partition by o.order_id),2) as a_osum,
+round(oi.order_item_subtotal*100/sum(oi.order_item_subtotal) over (partition by o.order_id),2) as p_osum,
+rank() over (partition by order_id order by order_item_subtotal desc) as r,
+dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr,
+round(percent_rank() over (partition by order_id order by order_item_subtotal desc),2) as pr,
+row_number() over (partition by order_id order by order_item_subtotal) as rna,
+row_number() over (partition by order_id order by order_item_subtotal desc) as rnd,
+lag(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as lg,
+lead(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as ld,
+first_value(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as fv,
+last_value(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as lv 
+from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id' 
+).show(789)
+
 
