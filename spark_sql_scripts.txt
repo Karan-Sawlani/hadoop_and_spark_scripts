@@ -200,10 +200,32 @@ here for each id group by id say take 2 so here subtotal by group is  299.99+199
  
 SO DO THIS INSTEAD
 
--> select order_id,order_date,order_status,order_item_subtotal,round(sum(order_item_subtotal) over (patition by o.order_id),2) order_revenue,order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') group by order_date having sum(order_item_subtotal) >=1000 order by order_date asc,order_revenue desc;
+-> 
+
+select order_id,
+order_date,
+order_status,
+order_item_subtotal,
+round(sum(order_item_subtotal) over (patition by o.order_id),2) order_revenue,
+order_item_subtotal/round(sum(order_item_subtotal) over (partition by o.order_id),2) percent_revenue 
+from orders o join order_items oi on o.order_id=oi.order_item_order_id where order_status in ('COMPLETE','CLOSED') 
+group by order_date having sum(order_item_subtotal) >=1000 
+order by order_date asc,order_revenue desc;
+
 -> check this query works or not
 
--> sqlContext.sql( 'select o.order_id, o.order_date, o.order_status,oi.order_item_subtotal,sum(oi.order_item_subtotal) over (partition by o.order_id) as sum_subtotal,avg(order_item_subtotal) over (partition by o.order_id) as avg_subtotal,oi.order_item_subtotal*100/sum(oi.order_item_subtotal) over (partition by o.order_id) as pct_subtotal from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having pct_subtotal>80' ).show(789)
+-> 
+
+sqlContext.sql('
+select o.order_id, 
+o.order_date, 
+o.order_status,
+oi.order_item_subtotal,
+sum(oi.order_item_subtotal) over (partition by o.order_id) as sum_subtotal,
+avg(order_item_subtotal) over (partition by o.order_id) as avg_subtotal,
+oi.order_item_subtotal*100/sum(oi.order_item_subtotal) over (partition by o.order_id) as pct_subtotal 
+from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having pct_subtotal>80' 
+).show(789)
 
 # this works
 
@@ -248,7 +270,14 @@ without_order ->  2       3       1       4      5          -> here all random
 
 # SECOND HIGHEST ORDER_SUBTOTAL
 
-sqlContext.sql( 'select o.order_id as oid, substr(o.order_date,1,10) as od, o.order_status as os,oi.order_item_subtotal as osum,rank() over (partition by order_id order by order_item_subtotal desc) as r,dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having dr = 2' ).show(789)
+sqlContext.sql( 
+'select o.order_id as oid, 
+substr(o.order_date,1,10) as od, 
+o.order_status as os,oi.order_item_subtotal as osum,
+rank() over (partition by order_id order by order_item_subtotal desc) as r,
+dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr 
+from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having dr = 2' 
+).show(789)
 
 WINDOWING FUNCTIONS (rarely used) 
 
