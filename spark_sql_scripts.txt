@@ -322,6 +322,41 @@ lead(order_item_subtotal) over (partition by order_id order by order_item_subtot
 first_value(order_item_subtotal) over (partition by order_id) as fv,
 last_value(order_item_subtotal) over (partition by order_id) as lv 
 from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id' 
-).show(789)
+).registerTempTable("sp")
 
+# changing format of table
+
+# create permanent table (can be deleted only if we want)
+
+sqlContext.sql("show tables").show()
+sqlContext.sql("select * from sp").show()
+sqlContext.sql("
+create table all_analytical_functions (
+oid int,
+od string,
+os string,
+osum float,
+s_osum float,
+a_osum float,
+p_osum float,
+r int,
+dr int,
+pr float,
+rna int,
+rnd int,
+lg float,
+ld float,
+fv float,
+lv float) 
+stored as ORC")
+
+sqlContext.sql("show tables").show()
+
+sqlContext.sql("describe sp").show()
+
+sqlContext.sql("describe all_analytical_functions").show()
+
+sqlContext.sql("insert into all_analytical_functions select * from sp")
+
+sqlContext.sql("select * from all_analytical_functions").show()
 
