@@ -246,6 +246,10 @@ row_number:
 with_order ->       1       3       2       4       5         -> ranks it as ordered but give random row numbers on equal records like here on 2 and 3  it may also be 1       2       3       4       5
 without_order ->  2       3       1       4      5          -> here all random
 
+# SECOND HIGHEST ORDER_SUBTOTAL
+
+sqlContext.sql( 'select o.order_id as oid, substr(o.order_date,1,10) as od, o.order_status as os,oi.order_item_subtotal as osum,round(sum(oi.order_item_subtotal) over (partition by o.order_id),2)as s_osum,round(avg(order_item_subtotal) over (partition by o.order_id),2) as a_osum,round(oi.order_item_subtotal*100/sum(oi.order_item_subtotal) over (partition by o.order_id),2) as p_osum,rank() over (partition by order_id order by order_item_subtotal desc) as r,dense_rank() over (partition by order_id order by order_item_subtotal desc) as dr,round(percent_rank() over (partition by order_id order by order_item_subtotal desc),2) as pr,row_number() over (partition by order_id order by order_item_subtotal) as rna,row_number() over (partition by order_id order by order_item_subtotal desc) as rnd from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id having dr = 2' ).show(789)
+
 WINDOWING FUNCTIONS (rarely used) 
 
 NOTE :-> windowing is used for time series analysis here used functions are lead(),lag(),first_value(),last_value() etc. fisrt_value gives the first value in group's subgroup vice versa for last_value,lead gives next value of record over particular group and lag for previous so for proper analysis of series have to do order by else random values will be generated.
