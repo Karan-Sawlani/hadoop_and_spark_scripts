@@ -319,8 +319,8 @@ row_number() over (partition by order_id order by order_item_subtotal) as rna,
 row_number() over (partition by order_id order by order_item_subtotal desc) as rnd,
 lag(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as lg,
 lead(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as ld,
-first_value(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as fv,
-last_value(order_item_subtotal) over (partition by order_id order by order_item_subtotal desc) as lv 
+first_value(order_item_subtotal) over (partition by order_id) as fv,
+last_value(order_item_subtotal) over (partition by order_id) as lv 
 from ordersmm o join order_itemsmm oi on o.order_id = oi.order_item_order_id' 
 ).show(789)
 
